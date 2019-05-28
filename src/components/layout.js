@@ -17,6 +17,7 @@ function Layout({ title, children }) {
         <h3
           style={{
             fontFamily: 'Montserrat, sans-serif',
+            color: 'var(--color-cyan)',
             marginTop: 0
           }}
         >

@@ -1,0 +1,10 @@
+:root {
+  --color-black: #111111;
+  --color-blue: #4271ae;
+  --color-green: #718c00;
+  --color-cyan: #3e999f;
+}
+
+a {
+  color: var(--color-cyan);
+}
