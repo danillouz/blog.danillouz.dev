@@ -63,8 +63,24 @@ function Layout({ location, title, children }) {
       <main>{children}</main>
 
       <footer>
-        © {new Date().getFullYear()}, Built with{' '}
-        <a href="https://www.gatsbyjs.org">Gatsby</a>
+        <p>&copy; {new Date().getFullYear()} Daniël Illouz</p>
+
+        <p>
+          <a href="/rss.xml" target="_blank" rel="noopener noreferrer">
+            RSS
+          </a>
+        </p>
+
+        <p>
+          Built with{' '}
+          <a
+            href="https://www.gatsbyjs.org"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Gatsby
+          </a>
+        </p>
       </footer>
     </div>
   );
