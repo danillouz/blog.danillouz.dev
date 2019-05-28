@@ -7,7 +7,11 @@ module.exports = {
     description: 'Writing about things I learn.',
     siteUrl: 'https://blog.danillouz.dev',
     social: {
-      twitter: 'danillouz'
+      website: 'https://www.danillouz.dev',
+      github: 'https://github.com/danillouz',
+      stackOverflow:
+        'https://stackoverflow.com/users/4455533/danillouz?tab=profile',
+      twitter: 'https://twitter.com/danillouz'
     }
   },
   plugins: [

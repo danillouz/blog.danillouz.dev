@@ -3,6 +3,8 @@ import { Link } from 'gatsby';
 
 import { rhythm } from '../utils/typography';
 
+import SocialLinks from './social-links';
+
 function Layout({ title, children }) {
   return (
     <div
@@ -36,13 +38,16 @@ function Layout({ title, children }) {
 
       <main>{children}</main>
 
-      <footer>
+      <footer
+        style={{
+          textAlign: 'center',
+          color: 'var(--color-grey)'
+        }}
+      >
         <p>&copy; {new Date().getFullYear()} Daniël Illouz</p>
 
         <p>
-          <a href="/rss.xml" target="_blank" rel="noopener noreferrer">
-            RSS
-          </a>
+          <SocialLinks />
         </p>
 
         <p>
