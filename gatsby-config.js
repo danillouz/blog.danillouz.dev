@@ -1,10 +1,10 @@
-const blogName = "Daniël's Blog";
+const blogName = 'blog.danillouz.dev';
 
 module.exports = {
   siteMetadata: {
     title: blogName,
     author: 'Daniël Illouz',
-    description: 'Writing about things I learned.',
+    description: 'Writing about things I learn.',
     siteUrl: 'https://blog.danillouz.dev',
     social: {
       twitter: 'danillouz'
@@ -59,8 +59,8 @@ module.exports = {
     {
       resolve: 'gatsby-plugin-manifest',
       options: {
-        name: "Daniël's Blog",
-        short_name: 'daniels-blog',
+        name: blogName,
+        short_name: blogName,
         start_url: '/',
         background_color: '#ffffff',
         theme_color: '#663399',

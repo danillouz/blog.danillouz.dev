@@ -23,6 +23,7 @@ const bioQuery = graphql`
     site {
       siteMetadata {
         author
+        description
         social {
           twitter
         }
@@ -36,11 +37,15 @@ function Bio() {
     <StaticQuery
       query={bioQuery}
       render={data => {
-        const { author, social } = data.site.siteMetadata;
+        const { author, description, social } = data.site.siteMetadata;
+
         return (
           <div
             style={{
-              display: 'flex',
+              display: 'grid',
+              gridTemplateColumns: 'auto 1fr',
+              gridGap: rhythm(1 / 2),
+              alignItems: 'center',
               marginBottom: rhythm(2.5)
             }}
           >
@@ -48,8 +53,7 @@ function Bio() {
               fixed={data.avatar.childImageSharp.fixed}
               alt={author}
               style={{
-                marginRight: rhythm(1 / 2),
-                marginBottom: 0,
+                margin: 0,
                 minWidth: 50,
                 borderRadius: '100%'
               }}
@@ -58,10 +62,24 @@ function Bio() {
               }}
             />
 
-            <p>
-              Written by{' '}
-              <a href={`https://twitter.com/${social.twitter}`}>{author}</a>.
-            </p>
+            <div>
+              <p
+                style={{
+                  margin: 0
+                }}
+              >
+                By{' '}
+                <a href={`https://twitter.com/${social.twitter}`}>{author}</a>.
+              </p>
+
+              <p
+                style={{
+                  margin: 0
+                }}
+              >
+                {description}
+              </p>
+            </div>
           </div>
         );
       }}
