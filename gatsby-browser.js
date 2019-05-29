@@ -1,9 +1,9 @@
-// Custom styles
-import './src/css/global.css';
-
 // Custom typefaces
 import 'typeface-montserrat';
 import 'typeface-merriweather';
 
+// Custom styles
+import './src/css/global.css';
+
 // Code syntax highlighting
-import 'prismjs/themes/prism-tomorrow.css';
+import './src/css/prism-night-owl.css';

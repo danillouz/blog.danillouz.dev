@@ -1,0 +1,134 @@
+/* Based on the Night Owl theme:
+https://github.com/sdras/night-owl-vscode-theme */
+
+/* Add back the container background-color, border-radius, padding, margin
+and overflow that we removed from <pre>. */
+.gatsby-highlight {
+  margin: 0 -1.75em 1.75em -1.75em;
+  padding: 1em;
+  background-color: var(--prism-custom-bg);
+  border-radius: 5px;
+  overflow: auto;
+
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Remove the default PrismJS theme background-color, border-radius, margin,
+padding and overflow.
+
+1. Make the element just wide enough to fit its content.
+2. Always fill the visible space in .gatsby-highlight.
+3. Adjust the position of the line numbers */
+.gatsby-highlight pre[class*='language-'] {
+  background-color: transparent;
+  margin: 0;
+  padding: 0;
+  overflow: initial;
+  float: left; /* 1 */
+  min-width: 100%; /* 2 */
+}
+
+.gatsby-highlight-code-line {
+  display: block;
+  background-color: var(--prism-custom-hl-bg);
+  margin-right: -1.16em;
+  margin-left: -1.16em;
+  padding-right: 1em;
+  padding-left: 0.85em;
+  border-left: 0.3em solid var(--prism-custom-hl-border);
+}
+
+@media (max-width: 690px) {
+  .gatsby-highlight {
+    margin: 0 -1.35em 1.75em -1.35em;
+    border-radius: 0;
+  }
+}
+
+code[class*='language-'],
+pre[class*='language-'] {
+  color: var(--prism-custom-fg);
+  background: none;
+  font-family: Consolas, Menlo, Monaco, source-code-pro, monospace;
+  font-weight: 100;
+  font-feature-settings: normal;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  word-wrap: normal;
+  line-height: 1.5;
+  margin-bottom: 0;
+  tab-size: 4;
+  hyphens: none;
+}
+
+pre[class*='language-']::selection,
+pre[class*='language-'] ::selection {
+  text-shadow: none;
+  /* background: #e0e0e0; */
+  background-color: #4373c2;
+}
+
+pre[data-line] {
+  padding: 1em 0 1em 3em;
+  position: relative;
+}
+
+/* Inline code */
+:not(pre) > code[class*='language-'] {
+  background: var(--inline-code-bg);
+  color: var(--inline-code-fg);
+  border-radius: 4px;
+  padding: 0.3em;
+  white-space: normal;
+}
+
+.token.comment {
+  color: var(--prism-custom-comment);
+}
+
+.token.plain-text,
+.token.punctuation,
+.token.parameter {
+  color: var(--prism-custom-fg);
+}
+
+.token.attr-name {
+  color: var(--prism-custom-blue);
+  font-style: italic;
+}
+
+.token.builtin,
+.token.char,
+.token.constant,
+.token.function {
+  color: var(--prism-custom-blue);
+}
+
+.token,
+.token.string {
+  color: var(--prism-custom-green);
+}
+
+.token.number,
+.token.class-name {
+  color: var(--prism-custom-orange);
+}
+
+.token.regex,
+.token.script {
+  color: var(--prism-custom-cyan);
+}
+
+.token.selector,
+.token.doctype,
+.token.tag,
+.token.operator,
+.token.keyword {
+  color: var(--prism-custom-purple);
+}
+
+.token.boolean {
+  color: var(--prism-custom-red);
+}

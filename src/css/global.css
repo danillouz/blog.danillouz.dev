@@ -1,9 +1,39 @@
 :root {
+  /* Primary colors: */
   --color-black: #111111;
   --color-blue: #4271ae;
   --color-green: #718c00;
   --color-cyan: #3e999f;
   --color-grey: #999999;
+
+  /* Dark theme: */
+  --prism-custom-bg: #011627;
+  --prism-custom-fg: #d6deeb;
+  --prism-custom-comment: #637777;
+  --prism-custom-blue: #82aaff;
+  --prism-custom-orange: #f78c6c;
+  --prism-custom-green: #addb67;
+  --prism-custom-cyan: #7fdbca;
+  --prism-custom-purple: #c792ea;
+  --prism-custom-red: #d3423e;
+  --prism-custom-hl-bg: #5f7e9779;
+  --prism-custom-hl-border: #faf39f;
+
+  /* Light theme: */
+  /* --prism-custom-bg: #fafafa;
+  --prism-custom-fg: #403f53;
+  --prism-custom-comment: #939dbb;
+  --prism-custom-blue: #4876d6;
+  --prism-custom-orange: #aa0982;
+  --prism-custom-green: #c96765;
+  --prism-custom-cyan: #0c969b;
+  --prism-custom-purple: #994cc3;
+  --prism-custom-red: #d3423e;
+  --prism-custom-hl-bg: #f0f0f0;
+  --prism-custom-hl-border: #ff869a; */
+
+  --inline-code-bg: #f0f0f0;
+  --inline-code-fg: #333333;
 }
 
 a {
