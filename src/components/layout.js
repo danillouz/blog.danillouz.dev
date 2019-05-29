@@ -41,16 +41,19 @@ function Layout({ title, children }) {
       <footer
         style={{
           textAlign: 'center',
-          color: 'var(--color-grey)'
+          color: 'var(--color-grey)',
+          fontSize: '0.8em'
         }}
       >
-        <p>&copy; {new Date().getFullYear()} Daniël Illouz</p>
+        <p style={{ marginBottom: '0.5em' }}>
+          &copy; {new Date().getFullYear()} Daniël Illouz
+        </p>
 
-        <p>
+        <p style={{ marginBottom: '0.5em' }}>
           <SocialLinks />
         </p>
 
-        <p>
+        <p style={{ marginBottom: '0.5em' }}>
           Built with{' '}
           <a
             href="https://www.gatsbyjs.org"
