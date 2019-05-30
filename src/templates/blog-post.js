@@ -41,7 +41,7 @@ function BlogPostTemplate({ data, pageContext, location }) {
       />
 
       <p>
-        If I explained something incorrectly 🐞 or if you have something to add,
+        If I explained something incorrectly or if you have something to add,
         please let me know by opening an issue on{' '}
         <a
           href="https://github.com/danillouz/blog.danillouz.dev/issues/new"
