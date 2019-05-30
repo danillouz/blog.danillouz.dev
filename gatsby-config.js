@@ -45,6 +45,11 @@ module.exports = {
               wrapperStyle: 'margin-bottom: 1.0725rem'
             }
           },
+
+          // Should be listed BEFORE primsjs plugin, like described here:
+          // https://www.gatsbyjs.org/packages/gatsby-remark-autolink-headers/#how-to-use
+          'gatsby-remark-autolink-headers',
+
           'gatsby-remark-prismjs',
           'gatsby-remark-copy-linked-files',
           'gatsby-remark-smartypants'
