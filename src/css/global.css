@@ -44,3 +44,12 @@ a {
 a.anchor {
   box-shadow: none;
 }
+
+figcaption {
+  margin-top: 0.5em;
+  text-align: center;
+  font-size: 0.9em;
+  font-family: sans-serif;
+  font-weight: 300;
+  color: #666;
+}
