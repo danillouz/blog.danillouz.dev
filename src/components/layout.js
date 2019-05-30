@@ -16,10 +16,11 @@ function Layout({ title, children }) {
       }}
     >
       <header>
-        <h3
+        <h2
           style={{
             fontFamily: 'Montserrat, sans-serif',
-            color: 'var(--color-cyan)',
+            fontWeight: 400,
+            color: 'var(--color-blue)',
             marginTop: 0
           }}
         >
@@ -33,7 +34,7 @@ function Layout({ title, children }) {
           >
             {title}
           </Link>
-        </h3>
+        </h2>
       </header>
 
       <main>{children}</main>
@@ -56,6 +57,7 @@ function Layout({ title, children }) {
         <p style={{ marginBottom: '0.5em' }}>
           Built with{' '}
           <a
+            style={{ color: 'var(--color-grey)'}}
             href="https://www.gatsbyjs.org"
             target="_blank"
             rel="noopener noreferrer"

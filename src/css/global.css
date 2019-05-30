@@ -4,7 +4,7 @@
   --color-blue: #4271ae;
   --color-green: #718c00;
   --color-cyan: #3e999f;
-  --color-grey: #999999;
+  --color-grey: #888888;
 
   /* Dark theme: */
   --prism-custom-bg: #011627;
@@ -25,7 +25,7 @@
   --prism-custom-comment: #939dbb;
   --prism-custom-blue: #4876d6;
   --prism-custom-orange: #aa0982;
-  --prism-custom-green: #c96765;
+  --prism-custom-green: #718c00;
   --prism-custom-cyan: #0c969b;
   --prism-custom-purple: #994cc3;
   --prism-custom-red: #d3423e;
@@ -51,5 +51,5 @@ figcaption {
   font-size: 0.9em;
   font-family: sans-serif;
   font-weight: 300;
-  color: #666;
+  color: var(--color-grey);
 }

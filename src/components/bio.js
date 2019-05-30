@@ -37,7 +37,8 @@ function Bio() {
               gridTemplateColumns: 'auto 1fr',
               gridGap: rhythm(1 / 2),
               alignItems: 'center',
-              marginBottom: rhythm(2.5)
+              marginBottom: rhythm(2.5),
+              fontWeight: 300
             }}
           >
             <Image
