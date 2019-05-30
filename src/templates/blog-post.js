@@ -35,9 +35,25 @@ function BlogPostTemplate({ data, pageContext, location }) {
 
       <hr
         style={{
+          backgroundColor: '#f0f0f0',
           marginBottom: rhythm(1)
         }}
       />
+
+      <p>
+        If I explained something incorrectly 🐞 or if you have something to add,
+        please let me know by opening an issue on{' '}
+        <a
+          href="https://github.com/danillouz/blog.danillouz.dev/issues/new"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          GitHub
+        </a>
+        .
+      </p>
+
+      <p>Thanks for reading, I hope you learned something new!</p>
 
       <Bio />
 
