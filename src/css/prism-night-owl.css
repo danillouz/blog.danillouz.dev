@@ -4,7 +4,7 @@ https://github.com/sdras/night-owl-vscode-theme */
 /* Add back the container background-color, border-radius, padding, margin
 and overflow that we removed from <pre>. */
 .gatsby-highlight {
-  margin: 0 -1.75em 1.75em -1.75em;
+  margin: 0 0 1.75em 0;
   padding: 1em;
   background-color: var(--prism-custom-bg);
   border-radius: 5px;
@@ -36,13 +36,6 @@ padding and overflow.
   padding-right: 1em;
   padding-left: 0.85em;
   border-left: 0.3em solid var(--prism-custom-hl-border);
-}
-
-@media (max-width: 690px) {
-  .gatsby-highlight {
-    margin: 0 -1.35em 1.75em -1.35em;
-    border-radius: 0;
-  }
 }
 
 code[class*='language-'],
