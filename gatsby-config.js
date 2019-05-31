@@ -72,11 +72,9 @@ module.exports = {
         short_name: blogName,
         start_url: '/',
         background_color: '#ffffff',
-        theme_color: '#663399',
-        display: 'minimal-ui'
-
-        // TODO: add icon: 'content/assets/icon.png'
-        // icon: 'content/assets/icon.png'
+        theme_color: '#4271ae',
+        display: 'minimal-ui',
+        icon: 'content/assets/icon.png'
       }
     },
     'gatsby-plugin-offline',
