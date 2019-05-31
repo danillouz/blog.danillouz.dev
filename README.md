@@ -1,6 +1,6 @@
 # blog.danillouz.dev
 
-My personal blog.
+Console Dot Blog. My personal blog.
 
 Built with [Gatsby](https://www.gatsbyjs.org).
 
