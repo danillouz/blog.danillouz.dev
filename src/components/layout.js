@@ -18,8 +18,8 @@ function Layout({ title, children }) {
       <header>
         <h2
           style={{
-            fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 400,
+            fontFamily: 'monospace',
+            fontWeight: 500,
             color: 'var(--color-blue)',
             marginTop: 0
           }}
@@ -32,7 +32,7 @@ function Layout({ title, children }) {
             }}
             to={'/'}
           >
-            {title}
+            console.blog();
           </Link>
         </h2>
       </header>

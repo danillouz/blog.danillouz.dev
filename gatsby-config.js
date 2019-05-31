@@ -1,4 +1,4 @@
-const blogName = 'blog.danillouz.dev';
+const blogName = 'Console Dot Blog';
 
 module.exports = {
   siteMetadata: {
@@ -69,11 +69,11 @@ module.exports = {
       resolve: 'gatsby-plugin-manifest',
       options: {
         name: blogName,
-        short_name: blogName,
+        short_name: 'console.blog',
         start_url: '/',
         background_color: '#ffffff',
         theme_color: '#4271ae',
-        display: 'minimal-ui',
+        display: 'standalone',
         icon: 'content/assets/icon.png'
       }
     },
