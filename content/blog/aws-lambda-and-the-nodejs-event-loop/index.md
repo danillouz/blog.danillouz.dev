@@ -6,7 +6,7 @@ description: 'Freezing and thawing the execution context can impact event loop b
 
 One of the more suprising things I learned while working with serverless technologies is how AWS Lambda interacts with the Node.js event loop.
 
-Lambda is powered by a <a href="https://aws.amazon.com/blogs/aws/firecracker-lightweight-virtualization-for-serverless-computing/" target="_blank">virtualization technology</a>. And to optimize performance it can "freeze" the execution context of your code. Later on the execution context can be "thawed" so it can be reused.
+Lambda is powered by a <a href="https://aws.amazon.com/blogs/aws/firecracker-lightweight-virtualization-for-serverless-computing/" target="_blank" rel="noopener noreferrer">virtualization technology</a>. And to optimize performance it can "freeze" the execution context of your code. Later on the execution context can be "thawed" so it can be reused.
 
 This will make your code run faster, but can impact the "expected" event loop behavior. We'll explore this in detail. But before we dive in, lets quickly refresh the Node.js concurrency model.
 
@@ -14,7 +14,7 @@ If you’re already familiar with the event loop and it’s mechanics, you can j
 
 ## Concurrency model
 
-Node.js is _single threaded_ and the <a href="https://nodejs.org/en/docs/guides/event-loop-timers-and-nexttick" target="_blank">event loop</a> is the concurrency model that allows non-blocking I/O operations to be performed.
+Node.js is _single threaded_ and the <a href="https://nodejs.org/en/docs/guides/event-loop-timers-and-nexttick" target="_blank" rel="noopener noreferrer">event loop</a> is the concurrency model that allows non-blocking I/O operations to be performed.
 
 > The event loop is what allows Node.js to perform non-blocking I/O operations — despite the fact that JavaScript is single-threaded — by offloading operations to the system kernel whenever possible.
 
@@ -222,7 +222,7 @@ The event loop can be literally thought of as a loop that runs indefinitely and 
 
 On every tick the event loop will check if there’s any work in the task queue. If there is, it will execute the task (function), **but only if the call stack is empty**.
 
-The event loop can be described with the following pseudo code, taken from <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop#Event_loop" target="_blank">MDN</a>:
+The event loop can be described with the following pseudo code, taken from <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/EventLoop#Event_loop" target="_blank" rel="noopener noreferrer">MDN</a>:
 
 ```js
 while (queue.waitForMessage()) {
@@ -344,17 +344,17 @@ The execution context is a temporary runtime environment that initializes any ex
 
 After a Lambda function is called, AWS Lambda maintains the execution context for some time in anticipation of another invocation of the Lambda function (for performance benefits). It "freezes" the execution context after a Lambda function completes and may choose to reuse ("thaw") the same execution context when the Lambda function is called again (but doesn’t have to).
 
-In the <a href="https://docs.aws.amazon.com/lambda/latest/dg/running-lambda-code.html" target="_blank">AWS documentation</a> we can find the following regarding this subject:
+In the <a href="https://docs.aws.amazon.com/lambda/latest/dg/running-lambda-code.html" target="_blank" rel="noopener noreferrer">AWS documentation</a> we can find the following regarding this subject:
 
 > Background processes or callbacks initiated by your Lambda function that did not complete when the function ended resume **if AWS Lambda chooses to** reuse the Execution Context.
 
-As well as this somewhat <a href="https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-handler.html" target="_blank">hidden message</a>:
+As well as this somewhat <a href="https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-handler.html" target="_blank" rel="noopener noreferrer">hidden message</a>:
 
 > When the callback is called (explicitly or implicitly), AWS Lambda continues the Lambda function invocation until the event loop is empty.
 
-Lets see if we can find some more information and search for <a href="https://www.google.com/search?q=lambda+callback+empty+event+loop&ie=utf-8&oe=utf-8" target="_blank">lambda + callback + empty + event loop</a>.
+Lets see if we can find some more information and search for <a href="https://www.google.com/search?q=lambda+callback+empty+event+loop&ie=utf-8&oe=utf-8" target="_blank" rel="noopener noreferrer">lambda + callback + empty + event loop</a>.
 
-The top result is about the <a href="https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-context.html" target="_blank">context object</a>. Looking through it we can find a property called `callbackWaitsForEmptyEventLoop`. This is what it does:
+The top result is about the <a href="https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-context.html" target="_blank" rel="noopener noreferrer">context object</a>. Looking through it we can find a property called `callbackWaitsForEmptyEventLoop`. This is what it does:
 
 > The default value is `true`. This property is useful only to modify the default behavior of the callback. **By default, the callback will wait until the event loop is empty before freezing the process and returning the results to the caller**.
 
@@ -694,7 +694,7 @@ This results in `"timeout cb fired after 5000 ms"` being printed first, because 
 
 Obviously this is undesired behavior and you should **not** write your code in the same way we wrote the code in `timeout.js`.
 
-Like stated in the <a href="https://docs.aws.amazon.com/lambda/latest/dg/running-lambda-code.html" target="_blank">AWS documentation</a>, we need to make sure to complete processing _all_ callbacks before our handler exits:
+Like stated in the <a href="https://docs.aws.amazon.com/lambda/latest/dg/running-lambda-code.html" target="_blank" rel="noopener noreferrer">AWS documentation</a>, we need to make sure to complete processing _all_ callbacks before our handler exits:
 
 > You should make sure any background processes or callbacks (in case of Node.js) in your code are complete before the code exits.
 
@@ -743,8 +743,8 @@ When we run our code with this change, all is well:
 
 I intentionally left out some details about the the task queue. There are actually _two_ task queues! One for _macrotasks_ (e.g. `setTimeout`) and one for _microtasks_ (e.g. `Promise`).
 
-According to the <a href="https://html.spec.whatwg.org/multipage/webappapis.html#task-queue" target="_blank">spec</a>, one macrotask should get processed per tick. After it finishes, all microtasks will be processed within the same tick. While these microtasks are processed they can queue more microtasks, **which will all be run in the same tick**.
+According to the <a href="https://html.spec.whatwg.org/multipage/webappapis.html#task-queue" target="_blank" rel="noopener noreferrer">spec</a>, one macrotask should get processed per tick. After it finishes, all microtasks will be processed within the same tick. While these microtasks are processed they can queue more microtasks, **which will all be run in the same tick**.
 
-For more information see <a href="https://blog.risingstack.com/node-js-at-scale-understanding-node-js-event-loop" target="_blank">this article from RisingStack</a> where they go more into detail. I highly recommend you read it.
+For more information see <a href="https://blog.risingstack.com/node-js-at-scale-understanding-node-js-event-loop" target="_blank" rel="noopener noreferrer">this article from RisingStack</a> where they go more into detail. I highly recommend you read it.
 
-Originally published on <a href="https://medium.com/radient-tech-blog/aws-lambda-and-the-node-js-event-loop-864e48fba49" target="_blank">Medium</a>.
+Originally published on <a href="https://medium.com/radient-tech-blog/aws-lambda-and-the-node-js-event-loop-864e48fba49" target="_blank" rel="noopener noreferrer">Medium</a>.

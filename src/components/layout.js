@@ -46,18 +46,30 @@ function Layout({ title, children }) {
           fontSize: '0.8em'
         }}
       >
-        <p style={{ marginBottom: '0.5em' }}>
+        <p
+          style={{
+            marginBottom: '0.5em'
+          }}
+        >
           &copy; {new Date().getFullYear()} Daniël Illouz
         </p>
 
-        <p style={{ marginBottom: '0.5em' }}>
+        <p
+          style={{
+            marginBottom: '0.5em'
+          }}
+        >
           <SocialLinks />
         </p>
 
-        <p style={{ marginBottom: '0.5em' }}>
+        <p
+          style={{
+            marginBottom: '0.5em'
+          }}
+        >
           Built with{' '}
           <a
-            style={{ color: 'var(--color-grey)'}}
+            style={{ color: 'var(--color-grey)' }}
             href="https://www.gatsbyjs.org"
             target="_blank"
             rel="noopener noreferrer"
