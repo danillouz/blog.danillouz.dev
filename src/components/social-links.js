@@ -29,11 +29,11 @@ function SocialLinks() {
             <a href={social.website} target="_blank" rel="noopener noreferrer">
               Website
             </a>{' '}
-            &bull;{' '}
+            &emsp;{' '}
             <a href={social.github} target="_blank" rel="noopener noreferrer">
               GitHub
             </a>{' '}
-            &bull;{' '}
+            &emsp;{' '}
             <a
               href={social.stackOverflow}
               target="_blank"
@@ -41,11 +41,11 @@ function SocialLinks() {
             >
               Stack Overflow
             </a>{' '}
-            &bull;{' '}
+            &emsp;{' '}
             <a href={social.twitter} target="_blank" rel="noopener noreferrer">
               Twitter
             </a>{' '}
-            &bull;{' '}
+            &emsp;{' '}
             <a href="/rss.xml" target="_blank" rel="noopener noreferrer">
               RSS
             </a>
