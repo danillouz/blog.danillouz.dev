@@ -20,7 +20,7 @@ function Layout({ title, children }) {
           style={{
             fontFamily: 'monospace',
             fontWeight: 500,
-            color: 'var(--color-blue)',
+            color: 'var(--color-black)',
             marginTop: 0
           }}
         >
@@ -32,7 +32,7 @@ function Layout({ title, children }) {
             }}
             to={'/'}
           >
-            console.blog();
+            console.<span style={{ color: 'var(--color-blue)' }}>blog</span>();
           </Link>
         </h2>
       </header>
@@ -42,8 +42,9 @@ function Layout({ title, children }) {
       <footer
         style={{
           textAlign: 'center',
-          color: 'var(--color-grey)',
-          fontSize: '0.8em'
+          fontFamily: 'sans-serif',
+          fontWeight: 300,
+          fontSize: '0.9em'
         }}
       >
         <p
@@ -69,7 +70,6 @@ function Layout({ title, children }) {
         >
           Built with{' '}
           <a
-            style={{ color: 'var(--color-grey)' }}
             href="https://www.gatsbyjs.org"
             target="_blank"
             rel="noopener noreferrer"

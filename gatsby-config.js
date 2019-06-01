@@ -1,4 +1,4 @@
-const blogName = 'Console Dot Blog';
+const blogName = 'Console dot Blog';
 
 module.exports = {
   siteMetadata: {

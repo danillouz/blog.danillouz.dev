@@ -17,36 +17,42 @@ function BlogIndex({ data, location }) {
 
       <Bio />
 
-      {posts.map(({ node }) => {
-        const title = node.frontmatter.title || node.fields.slug;
-        return (
-          <div key={node.fields.slug}>
-            <h3
-              style={{
-                marginBottom: rhythm(1 / 4)
-              }}
-            >
-              <Link
+      <section
+        style={{
+          marginBottom: rhythm(2.5)
+        }}
+      >
+        {posts.map(({ node }) => {
+          const title = node.frontmatter.title || node.fields.slug;
+          return (
+            <div key={node.fields.slug}>
+              <h3
                 style={{
-                  color: 'var(--color-black)',
-                  boxShadow: 'none'
+                  marginBottom: rhythm(1 / 4)
                 }}
-                to={node.fields.slug}
               >
-                {title}
-              </Link>
-            </h3>
+                <Link
+                  style={{
+                    color: 'var(--color-black)',
+                    boxShadow: 'none'
+                  }}
+                  to={node.fields.slug}
+                >
+                  {title}
+                </Link>
+              </h3>
 
-            <small>{node.frontmatter.date}</small>
+              <small>{node.frontmatter.date}</small>
 
-            <p
-              dangerouslySetInnerHTML={{
-                __html: node.frontmatter.description || node.excerpt
-              }}
-            />
-          </div>
-        );
-      })}
+              <p
+                dangerouslySetInnerHTML={{
+                  __html: node.frontmatter.description || node.excerpt
+                }}
+              />
+            </div>
+          );
+        })}
+      </section>
     </Layout>
   );
 }
