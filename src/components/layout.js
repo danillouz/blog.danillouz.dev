@@ -1,27 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'gatsby';
 
 import { rhythm } from '../utils/typography';
 
 import SocialLinks from './social-links';
-import ThemeToggle, { getDarkModeSetting } from './theme-toggle';
 
 function Layout({ children }) {
-  const [isDark, setIsDark] = useState(getDarkModeSetting());
-
-  const handleToggle = () => {
-    setIsDark(prevState => !prevState);
-  };
-
   return (
     <div
-      className={`layout ${isDark ? 'dark' : 'light'}`}
       style={{
         overflow: 'auto',
         padding: `${rhythm(1.5)} ${rhythm(3 / 4)}`,
         minHeight: '100vh',
-        color: 'var(--fg)',
-        backgroundColor: 'var(--bg)'
+        color: 'var(--color-black)',
+        backgroundColor: 'var(--color-white)'
       }}
     >
       <main
@@ -32,15 +24,13 @@ function Layout({ children }) {
       >
         <header
           style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr auto',
-            alignItems: 'center',
             marginBottom: '1em'
           }}
         >
-          <h3
+          <h1
             style={{
               fontFamily: 'monospace',
+              fontSize: '2.6em',
               fontWeight: 500,
               margin: 0
             }}
@@ -53,11 +43,17 @@ function Layout({ children }) {
               }}
               to={'/'}
             >
-              console.<span className="brand">blog</span>();
+              console.
+              <span
+                style={{
+                  color: 'var(--color-orange)'
+                }}
+              >
+                blog
+              </span>
+              ();
             </Link>
-          </h3>
-
-          <ThemeToggle toggle={handleToggle} isDark={isDark} />
+          </h1>
         </header>
         {children}
       </main>
