@@ -1,43 +1,66 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'gatsby';
 
 import { rhythm } from '../utils/typography';
 
 import SocialLinks from './social-links';
+import ThemeToggle, { getDarkModeSetting } from './theme-toggle';
 
-function Layout({ title, children }) {
+function Layout({ children }) {
+  const [isDark, setIsDark] = useState(getDarkModeSetting());
+
+  const handleToggle = () => {
+    setIsDark(prevState => !prevState);
+  };
+
   return (
     <div
+      className={`layout ${isDark ? 'dark' : 'light'}`}
       style={{
-        marginLeft: 'auto',
-        marginRight: 'auto',
-        maxWidth: rhythm(24),
-        padding: `${rhythm(1.5)} ${rhythm(3 / 4)}`
+        overflow: 'auto',
+        padding: `${rhythm(1.5)} ${rhythm(3 / 4)}`,
+        minHeight: '100vh',
+        color: 'var(--fg)',
+        backgroundColor: 'var(--bg)'
       }}
     >
-      <header>
-        <h2
+      <main
+        style={{
+          margin: 'auto',
+          maxWidth: rhythm(24)
+        }}
+      >
+        <header
           style={{
-            fontFamily: 'monospace',
-            fontWeight: 500,
-            color: 'var(--color-black)',
-            marginTop: 0
+            display: 'grid',
+            gridTemplateColumns: '1fr auto',
+            alignItems: 'center',
+            marginBottom: '1em'
           }}
         >
-          <Link
+          <h3
             style={{
-              boxShadow: 'none',
-              textDecoration: 'none',
-              color: 'inherit'
+              fontFamily: 'monospace',
+              fontWeight: 500,
+              margin: 0
             }}
-            to={'/'}
           >
-            console.<span style={{ color: 'var(--color-blue)' }}>blog</span>();
-          </Link>
-        </h2>
-      </header>
+            <Link
+              style={{
+                boxShadow: 'none',
+                textDecoration: 'none',
+                color: 'inherit'
+              }}
+              to={'/'}
+            >
+              console.<span className="brand">blog</span>();
+            </Link>
+          </h3>
 
-      <main>{children}</main>
+          <ThemeToggle toggle={handleToggle} isDark={isDark} />
+        </header>
+        {children}
+      </main>
 
       <footer
         style={{

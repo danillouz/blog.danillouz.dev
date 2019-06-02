@@ -33,7 +33,7 @@ function BlogIndex({ data, location }) {
               >
                 <Link
                   style={{
-                    color: 'var(--color-black)',
+                    color: 'var(--fg)',
                     boxShadow: 'none'
                   }}
                   to={node.fields.slug}

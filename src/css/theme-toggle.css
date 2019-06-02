@@ -1,0 +1,30 @@
+.theme-toggle {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+}
+
+.switch {
+  font-family: sans-serif;
+  font-weight: 600;
+  margin: 0;
+  padding: 0.5em;
+  border: 0;
+  border-radius: 4px;
+  width: 110px;
+  text-align: center;
+}
+
+.switch:hover {
+  cursor: pointer;
+}
+
+.light .switch {
+  color: var(--color-white);
+  background-color: var(--color-black);
+}
+
+.dark .switch {
+  color: var(--color-black);
+  background-color: var(--color-white);
+}
