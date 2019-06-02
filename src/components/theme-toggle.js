@@ -21,7 +21,6 @@ export const getDarkModeSetting = () => {
 };
 
 function ThemeToggle({ toggle, isDark }) {
-  console.log('isDark: ', isDark);
   useEffect(() => {
     window.localStorage.setItem('dark', isDark);
   }, [isDark]);
