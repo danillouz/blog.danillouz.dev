@@ -72,7 +72,7 @@ module.exports = {
         short_name: 'console.blog',
         start_url: '/',
         background_color: '#ffffff',
-        theme_color: '#4271ae',
+        theme_color: '#ff6c0a',
         display: 'standalone',
         icon: 'content/assets/icon.png'
       }
