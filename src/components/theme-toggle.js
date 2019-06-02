@@ -10,9 +10,9 @@ const getPrefersDark = () => {
 };
 
 export const getDarkModeSetting = () => {
-  const hasStored = localStorage.hasOwnProperty('dark');
+  const hasStored = window.localStorage.hasOwnProperty('dark');
   if (hasStored) {
-    const storedSetting = JSON.parse(localStorage.getItem('dark'));
+    const storedSetting = JSON.parse(window.localStorage.getItem('dark'));
     return storedSetting;
   }
 
@@ -23,7 +23,7 @@ export const getDarkModeSetting = () => {
 function ThemeToggle({ toggle, isDark }) {
   console.log('isDark: ', isDark);
   useEffect(() => {
-    localStorage.setItem('dark', isDark);
+    window.localStorage.setItem('dark', isDark);
   }, [isDark]);
 
   return (
