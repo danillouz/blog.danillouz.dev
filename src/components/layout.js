@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'gatsby';
 
 import { rhythm } from '../utils/typography';
@@ -7,7 +7,14 @@ import SocialLinks from './social-links';
 import ThemeToggle, { getDarkModeSetting } from './theme-toggle';
 
 function Layout({ children }) {
-  const [isDark, setIsDark] = useState(getDarkModeSetting());
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const _isDark = getDarkModeSetting();
+    if (_isDark !== isDark) {
+      setIsDark(_isDark);
+    }
+  }, []);
 
   const handleToggle = () => {
     setIsDark(prevState => !prevState);
