@@ -170,3 +170,44 @@ It's this policy that tells APIG that it's "okay" to invoke a downstream Lambda 
 Note that the Lambda Authorizer will actually only _authenticate_ the caller (I know, terminology right!). But it's possible for the Lambda Authorizer to propagate `context` information to any downstream Lambdas. And this "context information" can be used by the downstream Lambda to do _authorization_. When using OAuth 2.0, scopes can be used and provided to a Lambda handler to achieve this.
 
 The handler can determine if the caller is allowed to make the request. For example, in our case we could have a `get:profile` scope. And the Lambda handler could check if it has this scope in their `context` Object when executing. If it's not there it can return a `403 Forbidden`.
+
+## How does the flow look like?
+
+We're now ready to implement the Lambda Authorizer and the API endpoint. But before we do, let's take a step back and try to make our mental model more concrete.
+
+We already know we have the following moving parts:
+
+- Auth0 is the third party auth provider that provides- and helps verify the token.
+- We have the AWS APIG that represents the Account API.
+- A Lambda Authorizer to verify the token with Auth0.
+- A Lambda handler for the `GET /profile` endpoint that returns the profile data.
+- `curl` that is used as a client to make request to the API.
+
+We can visualize this as follows:
+
+<ol>
+  <li>We obtain a test token from the Auth0 API details "Test" tab</li>
+
+  <li>We make the HTTP request to the APIG (the account API) and send the token (step 1) via the Authorization header.</li>
+
+  <li>APIG checks if a Lambda Authorizer is configured. If so, it invokes it and provides the Authorization header to the Lambda Authorizer.</li>
+
+  <li>The Lambda Authorizer:
+    <ul>
+      <li>Extracts the token from the Authorization header.</li>
+      <li>Fetches the public JWKS key from Auth0.</li>
+      <li>Verifies the token is signed with the public key.</li>
+      <li>Verifies the token has the required "Issuer" and "Audience" claims.</li>
+      <li>Returns an IAM Policy document when the token is valid.</li>
+    </ul>
+  </li>
+
+  <li>APIG evaluates the IAM Policy document and when the "Effect" is:
+    <ul>
+      <li>"Deny": API Gateway returns "403 Forbidden".</li>
+      <li>"Allow": Invokes the Lambda handler.</li>
+    </ul>
+  </li>
+
+  <li>The Lambda handler executes and returns the profile data back to the client.</li>
+</ol>
