@@ -35,7 +35,7 @@ In order to secure our API we can use:
 
 - <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol (a simple identity layer built on top of OAuth 2.0).
 
-- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based auth</a>: a strategy that allows clients to send "auth information" to a protected API, when making requests on behalf of a user or themselves (e.g. sending a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">Bearer Token</a> via an HTTP request header).
+- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based auth</a>: a strategy that allows clients to send "auth information" to a protected API, when making requests on behalf of a user or themselves (e.g. sending a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">bearer token</a> via an HTTP request header).
 
 Now, you could choose to implement this yourself and build your own "auth server". But I think that (in most cases) you should _not_ do this. Why not? Because it will require all your focus to build, operate and maintain it. Or in other words, it will cost you (and your team) a _lot_ of time, energy and money.
 
@@ -50,3 +50,41 @@ Another (sometimes overlooked) benefit of choosing _buy over build_, is that you
 However, I do recommend you build an auth service yourself for learning purposes. I think it's quite fun and challenging. More importantly, you'll get a deeper understanding of the subject--which will be _very_ helpful when you're navigating the "documentation jungle" of your favorite auth provider.
 
 Okay, lets get started!
+
+## What will we build?
+
+We'll build a very simple API with a single endpoint that returns some profile data.
+
+This endpoint is protected and requires a bearer token to return the profile data. The token will be sent via the `Authorization` request header.
+
+**Endpoint:**
+
+```
+GET /profile
+```
+
+**Request Headers:**
+
+| Name            | Required | Description                                                                                         |
+| --------------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `Authorization` | Yes      | Contains the client's token in the format `Bearer TOKEN`. Note that `Bearer` _must_ be capitalized. |
+
+**Example Request:**
+
+```
+HTTP GET /profile HTTP/1.1
+Authorization: Bearer eyJ...lKw
+```
+
+**Example Response:**
+
+```
+HTTP 200 OK
+Content-Type: application/json
+```
+
+```json
+{
+  "name": "Daniël"
+}
+```
