@@ -135,3 +135,38 @@ curl --request GET \
 ```
 
 Pretty cool right! We'll use this after we implement the Lambda Authorizer and the API endpoint.
+
+## What's a Lambda Authorizer?
+
+The Lambda Authorizer is a feature of APIG to control access to our API. From the AWS <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html#api-gateway-lambda-authorizer-flow" target="_blank" rel="noopener noreferrer">docs</a>:
+
+> A Lambda authorizer is useful if you want to implement a custom authorization scheme that uses a bearer token authentication strategy such as OAuth...
+
+When a client makes a request to the APIG (i.e. the Account API), AWS will invoke the Lambda Authorizer _first_ (when configured). The Lambda Authorizer then extracts the bearer token from the `Authorization` request header and validates it with Auth0 by:
+
+1. Fetching a public JWKS key from the JWKS URI.
+2. Verifying the token is signed with the public key.
+3. Verifying the token has the required "Issuer" and "Audience" claims.
+
+Only when the token passes these checks, the Lambda Authorizer will output an <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html" target="_blank" rel="noopener noreferrer">IAM Policy</a> document:
+
+```json
+{
+  "policyDocument": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Action": "execute-api:Invoke",
+        "Effect": "Allow",
+        "Resource": "ARN_OF_LAMBDA_HANDLER"
+      }
+    ]
+  }
+}
+```
+
+It's this policy that tells APIG that it's "okay" to invoke a downstream Lambda handler. In our case the Lambda handler that returns the profile data.
+
+Note that the Lambda Authorizer will actually only _authenticate_ the caller (I know, terminology right!). But it's possible for the Lambda Authorizer to propagate `context` information to any downstream Lambdas. And this "context information" can be used by the downstream Lambda to do _authorization_. When using OAuth 2.0, scopes can be used and provided to a Lambda handler to achieve this.
+
+The handler can determine if the caller is allowed to make the request. For example, in our case we could have a `get:profile` scope. And the Lambda handler could check if it has this scope in their `context` Object when executing. If it's not there it can return a `403 Forbidden`.
