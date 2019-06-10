@@ -4,7 +4,9 @@ date: '2019-06-07T17:03:43.227Z'
 description: 'How to protect AWS API Gateway endpoints with Lambda and Auth0.'
 ---
 
-Auth is complicated, it can be difficult to reason about and hard to work with. The terminology can be complex as well--terms are sometimes used interchangeably or can be ambiguous. Like saying "auth" to refer to both authentication (who are you?) _and_ authorization (I know who you are, but what are you allowed to do?).
+> 'Auth is complicated'.
+
+It can be difficult to reason about- and hard to work with auth. The terminology can be complex as well--terms are sometimes used interchangeably or can be ambiguous. Like saying "auth" to refer to both authentication (who are you?) _and_ authorization (I know who you are, but what are you allowed to do?).
 
 On top of that, it can also be challenging to know when to use what. Depending on what you're building and for whom, different auth protocols and strategies might be more suitable or required.
 
@@ -12,19 +14,20 @@ I won't be covering these protocols and strategies in depth. Instead, I want to 
 
 ## Use case and technologies
 
-> How can we secure an HTTP API with a token based auth strategy. So only authenticated- and authorized users can access it via a web client?
+> How can we secure an HTTP API with a token based auth strategy. So only authenticated- and authorized users can access it via a (web) client?
 
 More specifically:
 
 - The HTTP API is an <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html" target="_blank" rel="noopener noreferrer">AWS API Gateway</a> (APIG).
 - The endpoints of the API are <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html" target="_blank" rel="noopener noreferrer">Lambda Proxy Integrations</a> (i.e. Lambda handlers).
 - The Lambda handlers are implemented using <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> and <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">serverless</a> framework.
-- The web client is a <a href="https://en.wikipedia.org/wiki/Single-page_application" target="_blank" rel="noopener noreferrer">Single Page Application</a> (SPA) built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a>.
 - <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a> is used as a third party auth provider.
+
+I'll focus on the "backend" and will use `curl` as the client to call the API. But it's fairly easy to (for example) use <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> to add auth to the "frontend" as well. I've implemented it on several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result.
 
 ## Why use a third party auth provider?
 
-I think it's important to explain the motivation behind this decision before we get started.
+Before we get started, I think it's important to explain the motivation behind this decision.
 
 In order to secure our API we can use:
 
@@ -32,9 +35,9 @@ In order to secure our API we can use:
 
 - <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol (a simple identity layer built on top of OAuth 2.0).
 
-- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based auth</a>: a strategy that allows clients (like a SPA) to send "auth information" to a protected API when making requests on behalf of a user (e.g. sending a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">Bearer Token</a> via an HTTP request header).
+- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based auth</a>: a strategy that allows clients to send "auth information" to a protected API, when making requests on behalf of a user or themselves (e.g. sending a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">Bearer Token</a> via an HTTP request header).
 
-You could choose to implement this yourself and build your own "auth server". But I think that (in most cases) you should _not_ do this. Why not? Because it will require all your focus to build, operate and maintain it. Or in other words, it will cost you (and your team) a _lot_ of time, energy and money.
+Now, you could choose to implement this yourself and build your own "auth server". But I think that (in most cases) you should _not_ do this. Why not? Because it will require all your focus to build, operate and maintain it. Or in other words, it will cost you (and your team) a _lot_ of time, energy and money.
 
 And even if you do manage to build it, the result can be poor. There will be bugs and edge cases you didn't think off. But because auth is a non trivial problem to solve, you might even implement (parts of) the spec incorrectly.
 
