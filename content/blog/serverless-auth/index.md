@@ -53,7 +53,7 @@ Okay, lets get started!
 
 ## What will we build?
 
-We'll build a very simple API with a single endpoint that returns some profile data.
+We'll build an Account API with a single endpoint that returns some profile data.
 
 This endpoint is protected and requires a bearer token to return the profile data. The token will be sent via the `Authorization` request header.
 
@@ -88,3 +88,50 @@ Content-Type: application/json
   "name": "Daniël"
 }
 ```
+
+## Register the API with Auth0
+
+When the Account API receives a request with the bearer token, it will have to validate the token with Auth0. In order to that, we first have to register our API with them:
+
+1. Create an Auth0 account and setup your tenant.
+2. In the main menu go to "APIs" and click on "Create API".
+3. Follow the <a href="https://auth0.com/docs/apis" target="_blank" rel="noopener noreferrer">instructions</a> and provide a "name" and "identifier". For example `Account API` and `https://api.danillouz.dev/account`.
+
+<figure>
+  <img src="./img/auth0/register.png" alt="Register you API with Auth0 by providing a name and identifier.">
+  <figcaption>Register you API with Auth0 by providing a name and identifier.</figcaption>
+</figure>
+
+Now that our API is registered, we need to take note of the following (public) properties, to later on configure our Lambda Authorizer correctly:
+
+- Token issuer: this is basically your Auth0 tenant. It always has the format `https://TENANT_NAME.REGION.auth0.com`. For example `https://danillouz.eu.auth0.com/`.
+- JWKS URI: this returns a <a href="https://auth0.com/docs/jwks" target="_blank" rel="noopener noreferrer">JSON Web Key Set (JWKS)</a>, which will be used by the Lambda Authorizer to obtain a public key from Auth0 to verify the token (more on that later). It always has the format `https://TENANT_NAME.REGION.auth0.com/.well-known/jwks.json`. For example `https://danillouz.eu.auth0.com/.well-known/jwks.json`.
+- Audience: this is `identifier` that was provided at step `3`. For example `https://api.danillouz.dev/account`.
+
+You can also find these values in the "Quick Start" section of the Auth0 API details screen (you were redirected here after registering the API). For example, click on the "Node.js" tab and look for these properties:
+
+- `issuer`
+- `jwksUri`
+- `audience`
+
+<figure>
+  <img src="./img/auth0/quick-start.png" alt="Find your public auth properties.">
+  <figcaption>Find your public auth properties.</figcaption>
+</figure>
+
+Now navigate to the "Test" tab in the Auth0 API details screen:
+
+<figure>
+  <img src="./img/auth0/test.png" alt="Get a generated test token for you API.">
+  <figcaption>Get a generated test token for you API.</figcaption>
+</figure>
+
+And if you scroll to the bottom, you'll see a `curl` command displayed with a ready to use token:
+
+```
+curl --request GET \
+  --url http://path_to_your_api/ \
+  --header 'authorization: Bearer eyJ...lKw
+```
+
+Pretty cool right! We'll use this after we implement the Lambda Authorizer and the API endpoint.
