@@ -173,39 +173,43 @@ The handler can determine if the caller is allowed to make the request. For exam
 
 ## How does the flow look like?
 
-We're now ready to implement the Lambda Authorizer and the API endpoint. But before we do, let's take a step back and try to make our mental model more concrete.
+We're now ready to implement the Lambda Authorizer and the Account API (endpoint). But before we do, let's take a step back and solidify our mental model.
 
-We already know we have the following moving parts:
+To summarize, we have the following "moving parts":
 
-- Auth0 is the third party auth provider that provides- and helps verify the token.
-- We have the AWS APIG that represents the Account API.
-- A Lambda Authorizer to verify the token with Auth0.
-- A Lambda handler for the `GET /profile` endpoint that returns the profile data.
-- `curl` that is used as a client to make request to the API.
+- Auth0 as the third party auth provider that provides- and helps verify the token.
+- AWS APIG that represents the Account API.
+- A Lambda Authorizer that verifies the token with Auth0.
+- A Lambda handler for the `GET /profile` endpoint, that returns the profile data.
+- `curl` as the client to make requests to the API.
 
-We can visualize this as follows:
+We can visualize how these parts interact with each other as follows:
+
+<figure>
+  <img src="./img/auth-flow.png" alt="Auth flow visualized.">
+  <figcaption>Auth flow visualized.</figcaption>
+</figure>
 
 <ol>
-  <li>We obtain a test token from the Auth0 API details "Test" tab</li>
+  <li>The client (curl) makes the HTTP request to the APIG (the account API) and send the token (obtained from the Auth0 API details "Test" tab) via the Authorization header.</li>
 
-  <li>We make the HTTP request to the APIG (the account API) and send the token (step 1) via the Authorization header.</li>
+  <li>With the incoming HTTP request, APIG checks if a Lambda Authorizer is configured for the endpoint. If so, APIG invokes it and provides the Authorization header.</li>
 
-  <li>APIG checks if a Lambda Authorizer is configured. If so, it invokes it and provides the Authorization header to the Lambda Authorizer.</li>
-
-  <li>The Lambda Authorizer:
+  <li>The Lambda Authorizer then:
     <ul>
-      <li>Extracts the token from the Authorization header.</li>
-      <li>Fetches the public JWKS key from Auth0.</li>
-      <li>Verifies the token is signed with the public key.</li>
-      <li>Verifies the token has the required "Issuer" and "Audience" claims.</li>
-      <li>Returns an IAM Policy document when the token is valid.</li>
+      <li>extracts the token from the Authorization header</li>
+      <li>fetches the JWKS (with the public key) from Auth0</li>
+      <li>verifies the token signature with the fetched public key</li>
+      <li>verifies the token has the required "Issuer" and "Audience" claims</li>
     </ul>
   </li>
 
-  <li>APIG evaluates the IAM Policy document and when the "Effect" is:
+  <li>If the token is verified, the Lambda Authorizer returns an IAM Policy document with "Effect" set to "Allow".</li>
+
+  <li>APIG evaluates the IAM Policy and when the "Effect" is:
     <ul>
-      <li>"Deny": API Gateway returns "403 Forbidden".</li>
-      <li>"Allow": Invokes the Lambda handler.</li>
+      <li>"Deny": APIG returns "403 Forbidden"</li>
+      <li>"Allow": APIG Invokes the Lambda handler</li>
     </ul>
   </li>
 
