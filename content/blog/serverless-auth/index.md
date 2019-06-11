@@ -91,7 +91,7 @@ Content-Type: application/json
 }
 ```
 
-## Register the API with Auth0
+## Registering the API with Auth0
 
 When the Account API receives a request with the bearer token, it will have to validate the token with Auth0. In order to that, we first have to register our API with them:
 
@@ -107,10 +107,10 @@ When the Account API receives a request with the bearer token, it will have to v
 Now that our API is registered, we need to take note of the following (public) properties, to later on configure our Lambda Authorizer correctly:
 
 - Token issuer: this is basically your Auth0 tenant. It always has the format `https://TENANT_NAME.REGION.auth0.com`. For example `https://danillouz.eu.auth0.com/`.
-- JWKS URI: this returns a <a href="https://auth0.com/docs/jwks" target="_blank" rel="noopener noreferrer">JSON Web Key Set (JWKS)</a>, which will be used by the Lambda Authorizer to obtain a public key from Auth0 to verify the token (more on that later). It always has the format `https://TENANT_NAME.REGION.auth0.com/.well-known/jwks.json`. For example `https://danillouz.eu.auth0.com/.well-known/jwks.json`.
-- Audience: this is `identifier` that was provided at step `3`. For example `https://api.danillouz.dev/account`.
+- JWKS URI: this returns a <a href="https://auth0.com/docs/jwks" target="_blank" rel="noopener noreferrer">JSON Web Key Set (JWKS)</a>, which will be used by the Lambda Authorizer to obtain a public key from Auth0 to verify the token signature (more on that later). It always has the format `https://TENANT_NAME.REGION.auth0.com/.well-known/jwks.json`. For example `https://danillouz.eu.auth0.com/.well-known/jwks.json`.
+- Audience: this is the `identifier` that was provided at step `3`. For example `https://api.danillouz.dev/account`.
 
-You can also find these values in the "Quick Start" section of the Auth0 API details screen (you were redirected here after registering the API). For example, click on the "Node.js" tab and look for these properties:
+You can also find these values in the "Quick Start" section of the Auth0 API details screen (you were redirected there after registering the API). For example, click on the "Node.js" tab and look for these properties:
 
 - `issuer`
 - `jwksUri`
@@ -140,11 +140,11 @@ Pretty cool right! We'll use this command after we implement the Lambda Authoriz
 
 ## What's a Lambda Authorizer?
 
-The Lambda Authorizer is a feature of APIG to control access to our API. From the AWS <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">docs</a>:
+The Lambda Authorizer is a feature of APIG to control access to our API. The AWS <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">docs</a> mention:
 
 > A Lambda authorizer is useful if you want to implement a custom authorization scheme that uses a bearer token authentication strategy such as OAuth...
 
-There are two types of authorizers:
+There are two types of Lambda Authorizers:
 
 1. Token based-authorizer.
 2. Request parameter-based authorizer.
@@ -153,11 +153,11 @@ And we'll be using the token-based one, which supports bearer tokens.
 
 ### What should it do?
 
-When a client makes a request to APIG, AWS will invoke the Lambda Authorizer _first_ (if configured). The Lambda Authorizer must then extract the bearer token from the `Authorization` request header and validate it with Auth0 by:
+When a client makes a request to APIG, AWS will invoke the Lambda Authorizer _first_ (if configured). The Lambda Authorizer must then extract the bearer token from the `Authorization` request header and verify it with the help of Auth0 by:
 
-1. Fetching the JWKS (with public key) from Auth0 using the [JWKS URI](#register-the-api-with-auth0).
+1. Fetching the JWKS (which contains the public key) from Auth0 using the [JWKS URI](#register-the-api-with-auth0).
 2. Verifying the token signature with the fetched public key.
-3. Verifying the token has the required ["Issuer" and "Audience"](#register-the-api-with-auth0) claims.
+3. Verifying the token has the correct ["Issuer" and "Audience"](#register-the-api-with-auth0) claims.
 
 Only when the token passes these checks, should the Lambda Authorizer output an <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html" target="_blank" rel="noopener noreferrer">IAM Policy</a> document with `Effect` set to `Allow`:
 
@@ -195,27 +195,66 @@ This will make APIG respond with `403 Forbidden`. Or you may return an `Unauthor
 
 ### A note on authorization
 
-I think it's good practice to only _authenticate_ the caller from the Lambda Authorizer and apply _authorization_ logic in any downstream Lambda handlers.
+I found it's good practice to only _authenticate_ the caller from the Lambda Authorizer and apply _authorization_ logic in downstream Lambda handlers.
 
-This may not be possible in all use cases, but if it is, it will keep your Lambda authorizer nice and _simple_--being only responsible for verifying the token and providing downstream Lambda's with authorization information.
+This may not be possible in all use cases, but doing this keeps your Lambda Authorizer _simple_. Because it will only be responsible for:
 
-You can propagate authorization information by returning a `context` object in the Lambda Authorizer's reponse. And this object can be used by downstream Lambda's to apply authorization logic. When using OAuth 2.0, scopes can be used and provided to achieve this. The Lambda handler can then determine if the caller is allowed to make a request. For example, in our case we could have a `get:profile` scope. And the Lambda handler could check if it has this scope in its `context` object when executing. If it's not there it can return a `403 Forbidden`.
+- Verifying the token.
+- Propagating authorization information downstream.
+
+You can propagate authorization information by returning a `context` object in the Lambda Authorizer's response (next to the policy document):
+
+```js
+'use strict';
+
+module.exports.authorizer = event => {
+  return {
+    principalId: 'UNIQUE_USER_ID',
+    policyDocument: {
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Action: 'execute-api:Invoke',
+          Effect: 'Allow',
+          Resource: event.methodArn
+        }
+      ]
+    },
+    context: {
+      scope: 'get:profile' // highlight-line
+    }
+  };
+};
+```
+
+Any properties passed to the Lambda authorizer's `context` object are made available to downstream Lambda handlers via the `event` object:
+
+```js
+'use strict';
+
+module.exports.handler = event => {
+  const { authorizer } = event.requestContext;
+  console.log('scope: ', authorizer.scope); // "get:profile"
+};
+```
+
+When using OAuth 2.0, scopes can be used and provided to achieve this. The Lambda handler can then determine if the caller is allowed to make a request. For example, in our case we could have a `get:profile` scope. And the Lambda handler could check if the caller has this scope in `authorizer.scope` when executing. If it's not there, it can return a `403 Forbidden`.
 
 We'll see this in action when we implement the Lambda Authorizer.
 
 ## How does the flow look like?
 
-We're now ready to implement the Lambda Authorizer and the Account API (endpoint). But before we do, let's take a step back and solidify our mental model.
+We're now ready to build the Lambda Authorizer and the Account API. But before we do, let's take a step back and solidify our mental model.
 
-To summarize, we have the following "moving parts":
+To summarize, we need the following components to protect our API:
 
-- Auth0 as the third party auth provider that provides- and helps verify the token.
-- AWS APIG that represents the Account API.
-- A Lambda Authorizer that verifies the token with Auth0.
-- A Lambda handler for the `GET /profile` endpoint, that returns the profile data.
-- `curl` as the client to make requests to the API.
+- Auth0 as the third party auth provider to provide- and help verify bearer tokens.
+- AWS APIG to represent the Account API.
+- A Lambda Authorizer to verify bearer tokens with Auth0.
+- A Lambda handler for the `GET /profile` endpoint to return the profile data.
+- `curl` as the client to send HTTP requests to the API.
 
-We can visualize how these parts interact with each other as follows:
+We can visualize how these components will interact with each other like this:
 
 <figure>
   <img src="./img/auth-flow.png" alt="Auth flow visualized.">
@@ -223,27 +262,25 @@ We can visualize how these parts interact with each other as follows:
 </figure>
 
 <ol>
-  <li>The client (curl) makes the HTTP request to the APIG (the account API) and send the token (obtained from the Auth0 API details "Test" tab) via the Authorization header.</li>
+  <li><code class="language-text">curl</code> will send an HTTP request to the <code class="language-text">GET /profile</code> endpoint, together with a token (obtained from the Auth0 API details "Test" tab) via the <code class="language-text">Authorization</code> request header.</li>
 
-  <li>With the incoming HTTP request, APIG checks if a Lambda Authorizer is configured for the endpoint. If so, APIG invokes it and provides the Authorization header.</li>
+  <li>When the HTTP request reaches APIG, it will check if a Lambda Authorizer is configured for the called endpoint. If so, APIG will invoke the Lambda Authorizer.</li>
 
-  <li>The Lambda Authorizer then:
+  <li>The Lambda Authorizer will then:
     <ul>
-      <li>extracts the token from the Authorization header</li>
-      <li>fetches the JWKS (with the public key) from Auth0</li>
-      <li>verifies the token signature with the fetched public key</li>
-      <li>verifies the token has the required "Issuer" and "Audience" claims</li>
+      <li>Extract the token from the <code class="language-text">Authorization</code> request header.</li>
+      <li>Fetch the JWKS (which contains the public key) from Auth0.</li>
+      <li>Verify the token signature with the fetched public key.</li>
+      <li>Verify the token has the correct "Issuer" and "Audience" claims.</li>
     </ul>
   </li>
 
-  <li>If the token is verified, the Lambda Authorizer returns an IAM Policy document with "Effect" set to "Allow".</li>
+  <li>If the token is verified, the Lambda Authorizer will return an IAM Policy document with <code class="language-text">Effect</code> set to <code class="language-text">Allow</code>.</li>
 
-  <li>APIG evaluates the IAM Policy and when the "Effect" is:
-    <ul>
-      <li>"Deny": APIG returns "403 Forbidden"</li>
-      <li>"Allow": APIG Invokes the Lambda handler</li>
-    </ul>
+  <li>APIG will now evaluate the IAM Policy and if the <code class="language-text">Effect</code> is set to <code class="language-text">Allow</code>, it will invoke the Lambda handler.
   </li>
 
-  <li>The Lambda handler executes and returns the profile data back to the client.</li>
+  <li>The Lambda handler will execute and return the profile data back to the client.</li>
 </ol>
+
+Great, now the easy part, writing the code!
