@@ -19,9 +19,11 @@ I won't be covering these protocols and strategies in depth. Instead, I want to 
 More specifically:
 
 - The HTTP API is an <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html" target="_blank" rel="noopener noreferrer">AWS API Gateway</a> (APIG).
+- The API's endpoints are protected with a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">bearer token</a>.
 - The endpoints of the API are <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html" target="_blank" rel="noopener noreferrer">Lambda Proxy Integrations</a> (i.e. Lambda handlers).
 - The Lambda handlers are implemented using <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> and <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">serverless</a> framework.
 - <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a> is used as a third party auth provider.
+- A <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">Lambda Authorizer</a> is used to verify the bearer token with Auth0.
 
 I'll focus on the "backend" and will use `curl` as the client to call the API. But it's fairly easy to (for example) use <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> to add auth to the "frontend" as well. I've implemented it on several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result.
 
@@ -35,7 +37,7 @@ In order to secure our API we can use:
 
 - <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol (a simple identity layer built on top of OAuth 2.0).
 
-- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based auth</a>: a strategy that allows clients to send "auth information" to a protected API, when making requests on behalf of a user or themselves (e.g. sending a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">bearer token</a> via an HTTP request header).
+- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based auth</a>: a strategy that allows clients to send "auth information" to a protected API, when making requests on behalf of a user or themselves (e.g. sending a bearer token via an HTTP request header).
 
 Now, you could choose to implement this yourself and build your own "auth server". But I think that (in most cases) you should _not_ do this. Why not? Because it will require all your focus to build, operate and maintain it. Or in other words, it will cost you (and your team) a _lot_ of time, energy and money.
 
@@ -55,28 +57,28 @@ Okay, lets get started!
 
 We'll build an Account API with a single endpoint that returns some profile data.
 
-This endpoint is protected and requires a bearer token to return the profile data. The token will be sent via the `Authorization` request header.
+Requirements and constraints:
 
-**Endpoint:**
+- The endpoint will be `GET /profile`.
+- The endpoint will require a bearer token to return the profile data.
+- The token will be sent via the `Authorization` request header.
+- The `Authorization` request header value must have the format: `Bearer TOKEN`.
+- The token is verified by a Lambda Authorizer.
+- The business logic of the endpoint will be implemented by a Lambda handler.
+- The endpoint will return data as JSON.
+- The endpoint will return a single property `name` with value `Daniël`.
+- The endpoint will return HTTP status code `200`.
 
-```
-GET /profile
-```
+### Example
 
-**Request Headers:**
-
-| Name            | Required | Description                                                                                         |
-| --------------- | -------- | --------------------------------------------------------------------------------------------------- |
-| `Authorization` | Yes      | Contains the client's token in the format `Bearer TOKEN`. Note that `Bearer` _must_ be capitalized. |
-
-**Example Request:**
+Request:
 
 ```
 HTTP GET /profile HTTP/1.1
 Authorization: Bearer eyJ...lKw
 ```
 
-**Example Response:**
+Response:
 
 ```
 HTTP 200 OK
@@ -126,7 +128,7 @@ Now navigate to the "Test" tab in the Auth0 API details screen:
   <figcaption>Get a generated test token for you API.</figcaption>
 </figure>
 
-And if you scroll to the bottom, you'll see a `curl` command displayed with a ready to use token:
+And if you scroll to the bottom, you'll see a `curl` command displayed with a ready to use test token:
 
 ```
 curl --request GET \
@@ -134,42 +136,72 @@ curl --request GET \
   --header 'authorization: Bearer eyJ...lKw
 ```
 
-Pretty cool right! We'll use this after we implement the Lambda Authorizer and the API endpoint.
+Pretty cool right! We'll use this command after we implement the Lambda Authorizer and the API endpoint.
 
 ## What's a Lambda Authorizer?
 
-The Lambda Authorizer is a feature of APIG to control access to our API. From the AWS <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html#api-gateway-lambda-authorizer-flow" target="_blank" rel="noopener noreferrer">docs</a>:
+The Lambda Authorizer is a feature of APIG to control access to our API. From the AWS <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">docs</a>:
 
 > A Lambda authorizer is useful if you want to implement a custom authorization scheme that uses a bearer token authentication strategy such as OAuth...
 
-When a client makes a request to the APIG (i.e. the Account API), AWS will invoke the Lambda Authorizer _first_ (when configured). The Lambda Authorizer then extracts the bearer token from the `Authorization` request header and validates it with Auth0 by:
+There are two types of authorizers:
 
-1. Fetching a public JWKS key from the JWKS URI.
-2. Verifying the token is signed with the public key.
-3. Verifying the token has the required "Issuer" and "Audience" claims.
+1. Token based-authorizer.
+2. Request parameter-based authorizer.
 
-Only when the token passes these checks, the Lambda Authorizer will output an <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html" target="_blank" rel="noopener noreferrer">IAM Policy</a> document:
+And we'll be using the token-based one, which supports bearer tokens.
 
-```json
+### What should it do?
+
+When a client makes a request to APIG, AWS will invoke the Lambda Authorizer _first_ (if configured). The Lambda Authorizer must then extract the bearer token from the `Authorization` request header and validate it with Auth0 by:
+
+1. Fetching the JWKS (with public key) from Auth0 using the [JWKS URI](#register-the-api-with-auth0).
+2. Verifying the token signature with the fetched public key.
+3. Verifying the token has the required ["Issuer" and "Audience"](#register-the-api-with-auth0) claims.
+
+Only when the token passes these checks, should the Lambda Authorizer output an <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html" target="_blank" rel="noopener noreferrer">IAM Policy</a> document with `Effect` set to `Allow`:
+
+```js
 {
-  "policyDocument": {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": "execute-api:Invoke",
-        "Effect": "Allow",
-        "Resource": "ARN_OF_LAMBDA_HANDLER"
-      }
-    ]
-  }
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "execute-api:Invoke",
+      "Effect": "Allow", // highlight-line
+      "Resource": "ARN_OF_LAMBDA_HANDLER"
+    }
+  ]
 }
 ```
 
-It's this policy that tells APIG that it's "okay" to invoke a downstream Lambda handler. In our case the Lambda handler that returns the profile data.
+It's this policy that tells APIG it's _allowed_ to invoke our downstream Lambda handler--in our case, the Lambda handler that returns the profile data.
 
-Note that the Lambda Authorizer will actually only _authenticate_ the caller (I know, terminology right!). But it's possible for the Lambda Authorizer to propagate `context` information to any downstream Lambdas. And this "context information" can be used by the downstream Lambda to do _authorization_. When using OAuth 2.0, scopes can be used and provided to a Lambda handler to achieve this.
+Alternatively the Lambda authorizer may _deny_ invoking the downstream handler by setting `Effect` to `Deny`:
 
-The handler can determine if the caller is allowed to make the request. For example, in our case we could have a `get:profile` scope. And the Lambda handler could check if it has this scope in their `context` Object when executing. If it's not there it can return a `403 Forbidden`.
+```js
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "execute-api:Invoke",
+      "Effect": "Deny", // highlight-line
+      "Resource": "ARN_OF_LAMBDA_HANDLER"
+    }
+  ]
+}
+```
+
+This will make APIG respond with `403 Forbidden`. Or you may return an `Unauthorized` error from the Lambda Authorizer to have APIG respond with `401 Unauthorized`.
+
+### A note on authorization
+
+I think it's good practice to only _authenticate_ the caller from the Lambda Authorizer and apply _authorization_ logic in any downstream Lambda handlers.
+
+This may not be possible in all use cases, but if it is, it will keep your Lambda authorizer nice and _simple_--being only responsible for verifying the token and providing downstream Lambda's with authorization information.
+
+You can propagate authorization information by returning a `context` object in the Lambda Authorizer's reponse. And this object can be used by downstream Lambda's to apply authorization logic. When using OAuth 2.0, scopes can be used and provided to achieve this. The Lambda handler can then determine if the caller is allowed to make a request. For example, in our case we could have a `get:profile` scope. And the Lambda handler could check if it has this scope in its `context` object when executing. If it's not there it can return a `403 Forbidden`.
+
+We'll see this in action when we implement the Lambda Authorizer.
 
 ## How does the flow look like?
 
