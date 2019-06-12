@@ -4,7 +4,7 @@ date: '2019-06-07T17:03:43.227Z'
 description: 'How to protect AWS API Gateway endpoints with Lambda and Auth0.'
 ---
 
-Auth is complicated. It can be difficult to reason about and hard to work with. The terminology can be complex as well--terms are sometimes used interchangeably or can be ambiguous. Like saying "auth" to refer to both authentication (who are you?) _and_ authorization (I know who you are, but what are you allowed to do?).
+Auth is complicated. It can be difficult to reason about and hard to work with. The terminology can be complex as well--terms are sometimes used interchangeably or can be ambiguous. Like saying "auth" to refer to both authentication (who are you?) and authorization (I know who you are, but what are you allowed to do?).
 
 On top of that, it can also be challenging to know when to use what. Depending on what you're building and for whom, different auth protocols and strategies might be more suitable or required.
 
@@ -17,33 +17,32 @@ I won't be covering these protocols and strategies in depth. Instead, I want to 
 More specifically:
 
 - The HTTP API is an <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html" target="_blank" rel="noopener noreferrer">AWS API Gateway</a> (APIG).
-- The API endpoints are protected with a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">bearer token</a>.
-- The API endpoints are implemented as <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html" target="_blank" rel="noopener noreferrer">Lambda Proxy Integrations</a> (i.e. Lambda handlers).
-- The Lambda handlers are implemented using <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> and the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">serverless</a> framework.
+- The API endpoints are protected with a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">bearer token</a> and implemented as <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html" target="_blank" rel="noopener noreferrer">Lambda Proxy Integrations</a> (i.e. Lambda handlers).
+- The Lambda handlers are implemented using <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> and the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>.
 - <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a> is used as a third party auth provider.
-- A <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">Lambda Authorizer</a> is used to verify the bearer token with Auth0.
+- An <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">APIG Lambda Authorizer</a> is used to verify the bearer token with Auth0.
 
 I'll focus on the "backend" and will use `curl` as the client to call the API. But it's fairly easy to use something like <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> and secure the "frontend" as well. I've implemented it in several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result. Let me know if you'd be interested to learn more about this and I might write a follow-up that focuses on the frontend implementation.
 
 ## Why use a third party auth provider?
 
-I already mentioned that I'll be using Auth0 as a third party auth provider. This means that I'm choosing _not_ to build (and operate!) my own "auth server". So before we get started, I think it's important to explain the motivation behind this decision.
+I mentioned that I'll be using Auth0 as a third party auth provider. This means that I'm choosing _not_ to build (nor operate!) my own "auth server". So before we get started, I think it's important to explain the motivation behind this decision.
 
-In order to build something as complex as an auth server, you could use:
+In order to build an auth server you could use:
 
 - <a href="https://oauth.net/2/" target="_blank" rel="noopener noreferrer">OAuth 2.0</a>: an authorization protocol.
 
-- <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol. This is an identity layer built on top of OAuth 2.0.
+- <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol. This is an "identity layer" built on top of OAuth 2.0.
 
-- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based authentication</a>: a strategy that requires clients to send a signed bearer token to protected APIs when making requests to it. The API will only respond to requests with verified tokens.
+- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based authentication</a>: a strategy that requires a client to send a signed bearer token when making requests to a protected API. The API will only respond to requests when it receives a verified token.
 
-- <a href="https://tools.ietf.org/html/rfc7519" target="_blank" rel="noopener noreferrer">JSON Web Tokens (JWT)</a>: a way to securely send auth information as JSON. The JWT contains a `Header`, `Payload` and `Signature` which are Base64 encoded and "dot" separated. In effect, the JWT is used as the bearer token. You can see how a JWT looks like by visiting <a href="https://jwt.io/" target="_blank" rel="noopener noreferrer">jwt.io</a>.
+- <a href="https://tools.ietf.org/html/rfc7519" target="_blank" rel="noopener noreferrer">JSON Web Tokens (JWTs)</a>: a way to securely send auth information as JSON. The JWT contains a `Header`, `Payload` and `Signature` which are Base64 encoded and "dot" separated. In effect, the JWT is used as the bearer token. You can see how a JWT looks like by visiting <a href="https://jwt.io/" target="_blank" rel="noopener noreferrer">jwt.io</a>.
 
-And with perhaps the help of some other tools/frameworks, you might be confident to make it happen. But I think that (in most cases) you shouldn't go down this route. Why not? Because it will require a _lot_ of focus to build, operate and maintain it. Or in other words, it will cost you (and your team) a lot of time, energy and money.
+And with perhaps the help of some other tools/frameworks, you might be confident to make it happen. But I think that (in most cases) you shouldn't go down this route. Why not? Because it will cost you (and your team) a _lot_ of time, energy and money to build, operate and maintain it.
 
-And even if you do manage to build it, the result can be poor. There will be bugs and edge cases you didn't think off. But because auth is a non trivial problem to solve, you might even implement (parts of) the spec incorrectly.
+And even if you do manage to build it, the result can be poor. There _will_ be bugs, and edge cases you didn't think off. But because auth is a nontrivial problem to solve, you might even implement (parts of) the spec incorrectly.
 
-If you do have a valid use case, plus enough resources and knowledge to build your own auth server, tread carefully. **A poor implementation will lead to a bad user experience and is also dangerous, because it can compromise your users and organization.**
+If you do have a valid use case plus enough resources and knowledge to build your own auth server, tread carefully. **A poor implementation will lead to a bad user experience and is also dangerous, because it can compromise your users and organization.**
 
 What should you do then? In my opinion, use a third party auth provider like <a href="https://aws.amazon.com/cognito/" target="_blank" rel="noopener noreferrer">Cognito</a> or <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a>. They give you all the fancy tooling, scalable infrastructure and resources you will need to provide a _secure_, _reliable_, _performant_ and _usable_ solution. Sure, you'll have to pay for it, but the pricing is _very_ fair. And it will most likely be a small fraction of what it would cost you when you'd roll your own solution.
 
@@ -67,9 +66,9 @@ Requirements and constraints:
 - The `Authorization` request header value must have the format: `Bearer TOKEN`.
 - The token is verified by a Lambda Authorizer.
 - The business logic of the endpoint will be implemented by a Lambda handler.
-- The endpoint will return data as JSON.
-- The endpoint will return a single property `name` with value `Daniël`.
-- The endpoint will return HTTP status code `200`.
+- The Lambda handler will return data as JSON.
+- The Lambda handler will return a single property `name` with value `Daniël`.
+- The Lambda handler will return HTTP status code `200`.
 
 ### Example
 
@@ -102,14 +101,14 @@ When the Account API receives a request with the bearer token, it will have to v
 3. Follow the <a href="https://auth0.com/docs/apis" target="_blank" rel="noopener noreferrer">instructions</a> and provide a "name" and "identifier". For example `Account API` and `https://api.danillouz.dev/account`.
 
 <figure>
-  <img src="./img/auth0/register.png" alt="Register you API with Auth0 by providing a name and identifier.">
+  <img src="./img/auth0/register.png" alt="Image of the Auth0 API registration form.">
   <figcaption>Register you API with Auth0 by providing a name and identifier.</figcaption>
 </figure>
 
 Now that our API is registered, we need to take note of the following (public) properties, to later on configure our Lambda Authorizer correctly:
 
 - Token issuer: this is basically your Auth0 tenant. It always has the format `https://TENANT_NAME.REGION.auth0.com`. For example `https://danillouz.eu.auth0.com/`.
-- JWKS URI: this returns a <a href="https://auth0.com/docs/jwks" target="_blank" rel="noopener noreferrer">JSON Web Key Set (JWKS)</a>, which will be used by the Lambda Authorizer to obtain a public key from Auth0 to verify the token signature (more on that later). It always has the format `https://TENANT_NAME.REGION.auth0.com/.well-known/jwks.json`. For example `https://danillouz.eu.auth0.com/.well-known/jwks.json`.
+- JWKS URI: this returns a <a href="https://auth0.com/docs/jwks" target="_blank" rel="noopener noreferrer">JSON Web Key Set (JWKS)</a>. The URI will be used by the Lambda Authorizer to fetch a public key from Auth0 to verify the token signature (more on that later). It always has the format `https://TENANT_NAME.REGION.auth0.com/.well-known/jwks.json`. For example `https://danillouz.eu.auth0.com/.well-known/jwks.json`.
 - Audience: this is the `identifier` that was provided at step `3`. For example `https://api.danillouz.dev/account`.
 
 You can also find these values in the "Quick Start" section of the Auth0 API details screen (you were redirected there after registering the API). For example, click on the "Node.js" tab and look for these properties:
@@ -119,14 +118,14 @@ You can also find these values in the "Quick Start" section of the Auth0 API det
 - `audience`
 
 <figure>
-  <img src="./img/auth0/quick-start.png" alt="Find your public auth properties.">
+  <img src="./img/auth0/quick-start.png" alt="Image of the Auth0 Node.js quick start.">
   <figcaption>Find your public auth properties.</figcaption>
 </figure>
 
 Now navigate to the "Test" tab in the Auth0 API details screen:
 
 <figure>
-  <img src="./img/auth0/test.png" alt="Get a generated test token for you API.">
+  <img src="./img/auth0/test.png" alt="Image that shows where to get a test token in the Auth0 UI.">
   <figcaption>Get a generated test token for you API.</figcaption>
 </figure>
 
@@ -138,28 +137,28 @@ curl --request GET \
   --header 'authorization: Bearer eyJ...lKw
 ```
 
-Pretty cool right! We'll use this command after we implement the Lambda Authorizer and the API endpoint.
+Pretty cool right! We'll use this command after we implement the Lambda Authorizer and the Account API.
 
 ## What's a Lambda Authorizer?
 
-The Lambda Authorizer is a feature of APIG to control access to our API. The AWS <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">docs</a> mention:
+I haven't explained what a Lambda Authorizer is yet. In short, it's a feature of APIG to control access to an API. The AWS <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">docs</a> say:
 
 > A Lambda authorizer is useful if you want to implement a custom authorization scheme that uses a bearer token authentication strategy such as OAuth...
 
-There are two types of Lambda Authorizers:
+There are actually two types of Lambda Authorizers:
 
-1. Token based-authorizer.
-2. Request parameter-based authorizer.
+1. Token based-authorizers.
+2. Request parameter-based authorizers.
 
-And we'll be using the token-based one, which supports bearer tokens.
+And we'll be using the token-based one, because it supports bearer tokens.
 
 ### What should it do?
 
-When a client makes a request to APIG, AWS will invoke the Lambda Authorizer _first_ (if configured). The Lambda Authorizer must then extract the bearer token from the `Authorization` request header and verify it with the help of Auth0 by:
+When a client makes a request to APIG, AWS will invoke the Lambda Authorizer _first_ (if configured). The Lambda Authorizer must then extract the bearer token from the `Authorization` request header and verify it by:
 
-1. Fetching the JWKS (which contains the public key) from Auth0 using the [JWKS URI](#register-the-api-with-auth0).
+1. Fetching the JWKS (which contains the public key) from Auth0 using the [JWKS URI](#registering-the-api-with-auth0).
 2. Verifying the token signature with the fetched public key.
-3. Verifying the token has the correct ["Issuer" and "Audience"](#register-the-api-with-auth0) claims.
+3. Verifying the token has the correct ["Issuer" and "Audience"](#registering-the-api-with-auth0) claims.
 
 Only when the token passes these checks, should the Lambda Authorizer output an <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html" target="_blank" rel="noopener noreferrer">IAM Policy</a> document with `Effect` set to `Allow`:
 
@@ -176,9 +175,9 @@ Only when the token passes these checks, should the Lambda Authorizer output an 
 }
 ```
 
-It's this policy that tells APIG it's _allowed_ to invoke our downstream Lambda handler--in our case, the Lambda handler that returns the profile data.
+It's this policy that tells APIG it's _allowed_ to invoke our downstream Lambda handler--in our case, that will be the Lambda handler that returns the profile data.
 
-Alternatively the Lambda authorizer may _deny_ invoking the downstream handler by setting `Effect` to `Deny`:
+Alternatively, the Lambda authorizer may _deny_ invoking the downstream handler by setting `Effect` to `Deny`:
 
 ```js
 {
@@ -197,9 +196,9 @@ This will make APIG respond with `403 Forbidden`. Or you may return an `Unauthor
 
 ### A note on authorization
 
-I found it's good practice to only _authenticate_ the caller from the Lambda Authorizer and apply _authorization_ logic in downstream Lambda handlers.
+I found it good practice to only _authenticate_ the caller from the Lambda Authorizer and apply _authorization_ logic _downstream_.
 
-This may not be possible in all use cases, but doing this keeps your Lambda Authorizer _simple_. Because it will only be responsible for:
+This may not be feasible in all use cases, but doing this keeps your Lambda Authorizer _simple_. Because it will only be responsible for:
 
 - Verifying the token.
 - Propagating authorization information downstream.
@@ -210,7 +209,7 @@ You can propagate authorization information by returning a `context` object in t
 'use strict';
 
 module.exports.authorizer = event => {
-  return {
+  const authResponse = {
     principalId: 'UNIQUE_USER_ID',
     policyDocument: {
       Version: '2012-10-17',
@@ -226,6 +225,8 @@ module.exports.authorizer = event => {
       scope: 'get:profile' // highlight-line
     }
   };
+
+  return authResponse;
 };
 ```
 
@@ -240,31 +241,31 @@ module.exports.handler = event => {
 };
 ```
 
-When using OAuth 2.0, scopes can be used and provided to achieve this. The Lambda handler can then determine if the caller is allowed to make a request. For example, in our case we could have a `get:profile` scope. And the Lambda handler could check if the caller has this scope in `authorizer.scope` when executing. If it's not there, it can return a `403 Forbidden`.
+When using OAuth 2.0, "scope" can be used and provided to achieve this. The Lambda handler can then determine if the caller is allowed to make a request. In our case we could have a `get:profile` scope. And the Lambda handler could check if the caller has this scope in `authorizer.scope` when executing. If it's not there, it can return a `403 Forbidden`.
 
 We'll see this in action when we implement the Lambda Authorizer.
 
-## How does the flow look like?
+## Solidifying our mental model
 
-We're now ready to build the Lambda Authorizer and the Account API. But before we do, let's take a step back and solidify our mental model.
+With that covered, we're now ready to build the Lambda Authorizer and the Account API. But before we do, let's take a step back and solidify our mental model.
 
 To summarize, we need the following components to protect our API:
 
-- Auth0 as the third party auth provider to provide- and help verify bearer tokens.
+- Auth0 as the third party auth provider to issue- and help verify bearer tokens.
 - AWS APIG to represent the Account API.
-- A Lambda Authorizer to verify bearer tokens with Auth0.
+- A Lambda Authorizer to verify tokens with Auth0.
 - A Lambda handler for the `GET /profile` endpoint to return the profile data.
 - `curl` as the client to send HTTP requests to the API.
 
-We can visualize how these components will interact with each other like this:
+We can visualize how these components will interact with each other as follows:
 
 <figure>
-  <img src="./img/auth-flow.png" alt="Auth flow visualized.">
-  <figcaption>Auth flow visualized.</figcaption>
+  <img src="./img/auth-flow.png" alt="Image that shows an auth flow diagram.">
+  <figcaption>The auth flow visualized.</figcaption>
 </figure>
 
 <ol>
-  <li><code class="language-text">curl</code> will send an HTTP request to the <code class="language-text">GET /profile</code> endpoint, together with a token (obtained from the Auth0 API details "Test" tab) via the <code class="language-text">Authorization</code> request header.</li>
+  <li><code class="language-text">curl</code> will send an HTTP request to the <code class="language-text">GET /profile</code> endpoint, together with a token (<a href="#registering-the-api-with-auth0">taken from the Auth0 API details "Test" tab</a>) via the <code class="language-text">Authorization</code> request header.</li>
 
   <li>When the HTTP request reaches APIG, it will check if a Lambda Authorizer is configured for the called endpoint. If so, APIG will invoke the Lambda Authorizer.</li>
 
