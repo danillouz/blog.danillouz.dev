@@ -29,29 +29,33 @@ I'll focus on the "backend" and will use `curl` as the client to call the API. B
 
 ## Why use a third party auth provider?
 
-Before we get started, I think it's important to explain the motivation behind this decision.
+I already mentioned that I'll be using Auth0 as a third party auth provider. This means that I'm choosing _not_ to build (and operate!) my own "auth server". So before we get started, I think it's important to explain the motivation behind this decision.
 
-In order to secure our API we can use:
+In order to build an auth server you could use:
 
 - <a href="https://oauth.net/2/" target="_blank" rel="noopener noreferrer">OAuth 2.0</a>: an authorization protocol.
 
-- <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol (a simple identity layer built on top of OAuth 2.0).
+- <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol. This is a simple identity layer built on top of OAuth 2.0.
 
-- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based auth</a>: a strategy that allows clients to send "auth information" to a protected API, when making requests on behalf of a user or themselves (e.g. sending a bearer token via an HTTP request header).
+- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based authentication</a>: a strategy that requires clients to send a signed bearer token to protected APIs when making requests to it. The API will only respond to requests with _verified_ tokens.
 
-Now, you could choose to implement this yourself and build your own "auth server". But I think that (in most cases) you should _not_ do this. Why not? Because it will require all your focus to build, operate and maintain it. Or in other words, it will cost you (and your team) a _lot_ of time, energy and money.
+- <a href="https://tools.ietf.org/html/rfc7519" target="_blank" rel="noopener noreferrer">JSON Web Tokens (JWT)</a>: a way to securely send auth information as JSON. The JWT contains a `Header`, `Payload` and `Signature` which are Base64 encoded and "dot" separated. In effect, the JWT is used as the bearer token. You can see how a JWT looks like by visiting <a href="https://jwt.io/" target="_blank" rel="noopener noreferrer">jwt.io</a>.
+
+And with perhaps some other tools/frameworks you might be confident to make it happen. But I think that (in most cases) you should not go down this route. Why not? Because it will require a _lot_ of focus to build, operate and maintain it. Or in other words, it will cost you (and your team) a lot of time, energy and money.
 
 And even if you do manage to build it, the result can be poor. There will be bugs and edge cases you didn't think off. But because auth is a non trivial problem to solve, you might even implement (parts of) the spec incorrectly.
 
-If you do have a valid use case to build your own auth server, tread carefully. **A poor implementation will lead to a bad user experience and is also dangerous, because it can compromise your users and organization.**
+If you do have a valid use case, plus enough resources and knowledge to build your own auth server, tread carefully. **A poor implementation will lead to a bad user experience and is also dangerous, because it can compromise your users and organization.**
 
-What should you do then? In my opinion, use a third party auth provider like <a href="https://aws.amazon.com/cognito/" target="_blank" rel="noopener noreferrer">Cognito</a> or <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a>. They give you all the fancy tooling and scalable infrastructure you will need to help you provide a secure, reliable, performant and usable solution. Sure, you'll have to pay for it, but the pricing is _very_ fair. And it will most likely be a small fraction of what it would cost you when you'd roll your own solution.
+What should you do then? In my opinion, use a third party auth provider like <a href="https://aws.amazon.com/cognito/" target="_blank" rel="noopener noreferrer">Cognito</a> or <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a>. They give you all the fancy tooling, scalable infrastructure and resources you will need to provide a _secure_, _reliable_, _performant_ and _usable_ solution. Sure, you'll have to pay for it, but the pricing is _very_ fair. And it will most likely be a small fraction of what it would cost you when you'd roll your own solution.
 
-Another (sometimes overlooked) benefit of choosing _buy over build_, is that you'll get access to the domain expert's _knowledge_. They will advise and help you choose the best auth strategy for you use case. And there's usually also a <a href="https://community.auth0.com/" target="_blank" rel="noopener noreferrer">community</a> you can turn to. **But leaving the complexities and challenges of auth to the experts gives you the ability to focus on your own things again**.
+Another (sometimes overlooked) benefit of choosing _buy over build_, is that you'll get access to the domain expert's _knowledge_. Where they can advise and help you choose the best auth strategy for you use case.
 
-However, I do recommend you build an auth service yourself for learning purposes. I think it's quite fun and challenging. More importantly, you'll get a deeper understanding of the subject--which will be _very_ helpful when you're navigating the "documentation jungle" of your favorite auth provider.
+And last but not least--leaving the complexities and challenges of auth to the experts, gives you the ability to _focus_ on your own things again!
 
-Okay, lets get started!
+However, I do recommend you build an auth service yourself for learning purposes. I think it's quite fun and challenging. And more importantly, you'll get a deeper understanding of the subject--which will be _very_ helpful when you're navigating the "documentation jungle" of your favorite auth provider.
+
+Okay, lets get started.
 
 ## What will we build?
 
