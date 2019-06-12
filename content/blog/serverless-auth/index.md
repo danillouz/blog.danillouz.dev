@@ -22,8 +22,6 @@ More specifically:
 - <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a> is used as a third party auth provider.
 - An <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">APIG Lambda Authorizer</a> is used to verify the bearer token with Auth0.
 
-I'll focus on the "backend" and will use `curl` as the client to call the API. But it's fairly easy to use something like <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> and secure the "frontend" as well. I've implemented it in several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result. Let me know if you'd be interested to learn more about this and I might write a follow-up that focuses on the frontend implementation.
-
 ## Why use a third party auth provider?
 
 I mentioned that I'll be using Auth0 as a third party auth provider. This means that I'm choosing _not_ to build (nor operate!) my own "auth server". So before we get started, I think it's important to explain the motivation behind this decision.
@@ -287,3 +285,11 @@ We can visualize how these components will interact with each other as follows:
 </ol>
 
 Great, now the easy part, writing the code!
+
+## In closing
+
+In this post I focused on the backend and showed you a way to implement "serverless auth". But it's fairly easy to use something like <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> and secure the frontend as well.
+
+This will allow your users to signup/login to your web app and get a token from Auth0. The web app can then use the token to send requests on behalf of the user to a protected API. In fact, you can reuse the Lambda Authorizer implementation in this post for that!
+
+I've implemented this in several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result. Let me know if you'd be interested to learn more about this and I might write a follow-up that focuses on the frontend implementation.
