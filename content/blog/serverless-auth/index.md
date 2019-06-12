@@ -4,13 +4,11 @@ date: '2019-06-07T17:03:43.227Z'
 description: 'How to protect AWS API Gateway endpoints with Lambda and Auth0.'
 ---
 
-> 'Auth is complicated'.
-
-It can be difficult to reason about- and hard to work with auth. The terminology can be complex as well--terms are sometimes used interchangeably or can be ambiguous. Like saying "auth" to refer to both authentication (who are you?) _and_ authorization (I know who you are, but what are you allowed to do?).
+Auth is complicated. It can be difficult to reason about and hard to work with. The terminology can be complex as well--terms are sometimes used interchangeably or can be ambiguous. Like saying "auth" to refer to both authentication (who are you?) _and_ authorization (I know who you are, but what are you allowed to do?).
 
 On top of that, it can also be challenging to know when to use what. Depending on what you're building and for whom, different auth protocols and strategies might be more suitable or required.
 
-I won't be covering these protocols and strategies in depth. Instead, I want to show you that implementing something as complex as auth can be quite simple. In order to do that, I'll focus on a specific (but common) use case. And show you how it can be implemented using a specific set of (serverless) technologies.
+I won't be covering these protocols and strategies in depth. Instead, I want to show you that implementing something as complex as auth can be quite simple. In order to do that, I'll focus on a specific (but common) use case. And show you how it can be implemented, using a specific set of (serverless) technologies.
 
 ## Use case and technologies
 
@@ -19,29 +17,29 @@ I won't be covering these protocols and strategies in depth. Instead, I want to 
 More specifically:
 
 - The HTTP API is an <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html" target="_blank" rel="noopener noreferrer">AWS API Gateway</a> (APIG).
-- The API's endpoints are protected with a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">bearer token</a>.
-- The endpoints of the API are <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html" target="_blank" rel="noopener noreferrer">Lambda Proxy Integrations</a> (i.e. Lambda handlers).
-- The Lambda handlers are implemented using <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> and <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">serverless</a> framework.
+- The API endpoints are protected with a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">bearer token</a>.
+- The API endpoints are implemented as <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html" target="_blank" rel="noopener noreferrer">Lambda Proxy Integrations</a> (i.e. Lambda handlers).
+- The Lambda handlers are implemented using <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> and the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">serverless</a> framework.
 - <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a> is used as a third party auth provider.
 - A <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">Lambda Authorizer</a> is used to verify the bearer token with Auth0.
 
-I'll focus on the "backend" and will use `curl` as the client to call the API. But it's fairly easy to (for example) use <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> to add auth to the "frontend" as well. I've implemented it on several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result.
+I'll focus on the "backend" and will use `curl` as the client to call the API. But it's fairly easy to use something like <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> and secure the "frontend" as well. I've implemented it in several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result. Let me know if you'd be interested to learn more about this and I might write a follow-up that focuses on the frontend implementation.
 
 ## Why use a third party auth provider?
 
 I already mentioned that I'll be using Auth0 as a third party auth provider. This means that I'm choosing _not_ to build (and operate!) my own "auth server". So before we get started, I think it's important to explain the motivation behind this decision.
 
-In order to build an auth server you could use:
+In order to build something as complex as an auth server, you could use:
 
 - <a href="https://oauth.net/2/" target="_blank" rel="noopener noreferrer">OAuth 2.0</a>: an authorization protocol.
 
-- <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol. This is a simple identity layer built on top of OAuth 2.0.
+- <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol. This is an identity layer built on top of OAuth 2.0.
 
-- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based authentication</a>: a strategy that requires clients to send a signed bearer token to protected APIs when making requests to it. The API will only respond to requests with _verified_ tokens.
+- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based authentication</a>: a strategy that requires clients to send a signed bearer token to protected APIs when making requests to it. The API will only respond to requests with verified tokens.
 
 - <a href="https://tools.ietf.org/html/rfc7519" target="_blank" rel="noopener noreferrer">JSON Web Tokens (JWT)</a>: a way to securely send auth information as JSON. The JWT contains a `Header`, `Payload` and `Signature` which are Base64 encoded and "dot" separated. In effect, the JWT is used as the bearer token. You can see how a JWT looks like by visiting <a href="https://jwt.io/" target="_blank" rel="noopener noreferrer">jwt.io</a>.
 
-And with perhaps some other tools/frameworks you might be confident to make it happen. But I think that (in most cases) you should not go down this route. Why not? Because it will require a _lot_ of focus to build, operate and maintain it. Or in other words, it will cost you (and your team) a lot of time, energy and money.
+And with perhaps the help of some other tools/frameworks, you might be confident to make it happen. But I think that (in most cases) you shouldn't go down this route. Why not? Because it will require a _lot_ of focus to build, operate and maintain it. Or in other words, it will cost you (and your team) a lot of time, energy and money.
 
 And even if you do manage to build it, the result can be poor. There will be bugs and edge cases you didn't think off. But because auth is a non trivial problem to solve, you might even implement (parts of) the spec incorrectly.
 
