@@ -36,9 +36,9 @@ In order to build an auth server you could use:
 
 - <a href="https://tools.ietf.org/html/rfc7519" target="_blank" rel="noopener noreferrer">JSON Web Tokens (JWTs)</a>: a way to securely send auth information as JSON. The JWT contains a `Header`, `Payload` and `Signature` which are Base64 encoded and "dot" separated. In effect, the JWT is used as the bearer token. You can see how a JWT looks like by visiting <a href="https://jwt.io/" target="_blank" rel="noopener noreferrer">jwt.io</a>.
 
-And with perhaps the help of some other tools/frameworks, you might be confident to make it happen. But I think that (in most cases) you shouldn't go down this route. Why not? Because it will cost you (and your team) a _lot_ of time, energy and money to build, operate and maintain it.
+And with perhaps the help of some other tools/frameworks, you might be confident to make it happen. But I think that (in most cases) you shouldn't go down this route. Why not? Because it will cost you and your team a _lot_ of time, energy and money to build, operate and maintain it.
 
-And even if you do manage to build it, the result can be poor. There _will_ be bugs, and edge cases you didn't think off. But because auth is a nontrivial problem to solve, you might even implement (parts of) the spec incorrectly.
+And even if you do manage to build it, the result can be poor. There _will_ be bugs, and edge cases you didn't think of. But because auth is a nontrivial problem to solve, you might even implement (parts of) the spec incorrectly.
 
 If you do have a valid use case plus enough resources and knowledge to build your own auth server, tread carefully. **A poor implementation will lead to a bad user experience and is also dangerous, because it can compromise your users and organization.**
 
@@ -96,18 +96,18 @@ When the Account API receives a request with the bearer token, it will have to v
 
 1. Create an Auth0 account and setup your tenant.
 2. In the main menu go to "APIs" and click on "Create API".
-3. Follow the <a href="https://auth0.com/docs/apis" target="_blank" rel="noopener noreferrer">instructions</a> and provide a "name" and "identifier". For example `Account API` and `https://api.danillouz.dev/account`.
+3. Follow the <a href="https://auth0.com/docs/apis" target="_blank" rel="noopener noreferrer">instructions</a> and provide a "Name" and "Identifier". For example `Account API` and `https://api.danillouz.dev/account`.
 
 <figure>
   <img src="./img/auth0/register.png" alt="Image of the Auth0 API registration form.">
   <figcaption>Register you API with Auth0 by providing a name and identifier.</figcaption>
 </figure>
 
-Now that our API is registered, we need to take note of the following (public) properties, to later on configure our Lambda Authorizer correctly:
+Now that our API is registered with Auth0, we need to take note of the following (public) properties, to later on configure our Lambda Authorizer correctly:
 
 - Token issuer: this is basically your Auth0 tenant. It always has the format `https://TENANT_NAME.REGION.auth0.com`. For example `https://danillouz.eu.auth0.com/`.
 - JWKS URI: this returns a <a href="https://auth0.com/docs/jwks" target="_blank" rel="noopener noreferrer">JSON Web Key Set (JWKS)</a>. The URI will be used by the Lambda Authorizer to fetch a public key from Auth0 to verify the token signature (more on that later). It always has the format `https://TENANT_NAME.REGION.auth0.com/.well-known/jwks.json`. For example `https://danillouz.eu.auth0.com/.well-known/jwks.json`.
-- Audience: this is the `identifier` that was provided at step `3`. For example `https://api.danillouz.dev/account`.
+- Audience: this is the "Identifier" you provided at step 3. For example `https://api.danillouz.dev/account`.
 
 You can also find these values in the "Quick Start" section of the Auth0 API details screen (you were redirected there after registering the API). For example, click on the "Node.js" tab and look for these properties:
 
@@ -239,13 +239,13 @@ module.exports.handler = event => {
 };
 ```
 
-When using OAuth 2.0, "scope" can be used and provided to achieve this. The Lambda handler can then determine if the caller is allowed to make a request. In our case we could have a `get:profile` scope. And the Lambda handler could check if the caller has this scope in `authorizer.scope` when executing. If it's not there, it can return a `403 Forbidden`.
+When using OAuth 2.0, "scope" can be provided and used to apply authorization logic. The Lambda handler can then determine if the caller is allowed to make a request. In our case we could have a `get:profile` scope. And the Lambda handler could check if the caller has this scope in `authorizer.scope` when executing. If it's not there, it can return a `403 Forbidden`.
 
 We'll see this in action when we implement the Lambda Authorizer.
 
 ## Solidifying our mental model
 
-With that covered, we're now ready to build the Lambda Authorizer and the Account API. But before we do, let's take a step back and solidify our mental model.
+With that covered, we're now ready to build the Lambda Authorizer and the Account API. But before we do, let's take a step back and solidify our mental model first.
 
 To summarize, we need the following components to protect our API:
 
@@ -255,7 +255,7 @@ To summarize, we need the following components to protect our API:
 - A Lambda handler for the `GET /profile` endpoint to return the profile data.
 - `curl` as the client to send HTTP requests to the API.
 
-We can visualize how these components will interact with each other as follows:
+We can visualize how these components will interact with each like this:
 
 <figure>
   <img src="./img/auth-flow.png" alt="Image that shows an auth flow diagram.">
@@ -290,6 +290,6 @@ Great, now the easy part, writing the code!
 
 In this post I focused on the backend and showed you a way to implement "serverless auth". But it's fairly easy to use something like <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> and secure the frontend as well.
 
-This will allow your users to signup/login to your web app and get a token from Auth0. The web app can then use the token to send requests on behalf of the user to a protected API. In fact, you can reuse the Lambda Authorizer implementation in this post for that!
+This will allow your users to signup/login to (for example) your web app and get a token from Auth0. The web app can then use the token to send requests on behalf of the user to a protected API. In fact, you can reuse the Lambda Authorizer implementation in this post for that!
 
-I've implemented this in several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result. Let me know if you'd be interested to learn more about this and I might write a follow-up that focuses on the frontend implementation.
+I've implemented this in several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result. Let me know if you'd be interested to learn more about that and I might write a follow-up that focuses on the frontend implementation.
