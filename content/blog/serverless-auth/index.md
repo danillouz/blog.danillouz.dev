@@ -287,6 +287,458 @@ We can visualize how these components will interact with each like this:
 
 Great, now the easy part, writing the code!
 
+## Implementing the Lambda Authorizer
+
+Create a new directory for the code:
+
+```sh
+mkdir lambda-authorizers
+```
+
+Move to this directory and initialize a new <a href="https://www.npmjs.com/" target="_blank" rel="noopener noreferrer">npm</a> project with:
+
+```sh
+npm init -y
+```
+
+This creates a `package.json` file:
+
+```shell
+lambda-authorizers
+  └── package.json # highlight-line
+```
+
+The following npm dependencies are required:
+
+```sh
+npm i jsonwebtoken jwks-rsa
+```
+
+The <a href="https://github.com/auth0/node-jsonwebtoken" target="_blank" rel="noopener noreferrer">jsonwebtoken</a> library will help use decode the JWT and verify the token's ["Issuer" and "Audience"](#registering-the-api-with-auth0) claims. And the <a href="https://github.com/auth0/node-jwks-rsa" target="_blank" rel="noopener noreferrer">jwks-rsa</a> library will help us fetch the JWKS an verify the token's signature.
+
+We'll use the Serverless Framework to configure and deploy the Lambda. Install it as a "dev" dependency:
+
+```sh
+npm i -D serverless
+```
+
+Create a `serverless.yaml` manifest in the directory root:
+
+```shell
+lambda-authorizers
+  ├── package.json
+  └── serverless.yaml # highlight-line
+```
+
+With the following contents:
+
+```yaml
+service: lambda-authorizers
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, 'prod'}
+  region: ${opt:region, 'eu-central-1'}
+  memorySize: 128
+  timeout: 3
+
+  # Tip: put all your artifacts in a single S3 bucket!
+  deploymentBucket:
+    name: api-artifacts
+    serverSideEncryption: AES256
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+```
+
+Add Auth0 configuration properties as environment variables:
+
+```yaml
+service: lambda-authorizers
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, 'prod'}
+  region: ${opt:region, 'eu-central-1'}
+  memorySize: 128
+  timeout: 3
+
+  # Tip: put all your artifacts in a single S3 bucket!
+  deploymentBucket:
+    name: api-artifacts
+    serverSideEncryption: AES256
+
+  # highlight-start
+  environment:
+    JWKS_URI: 'https://danillouz.eu.auth0.com/.well-known/jwks.json'
+    TOKEN_ISSUER: 'https://danillouz.eu.auth0.com/'
+    AUDIENCE: 'https://api.danillouz.dev/account'
+  # highlight-end
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+```
+
+Add the Lambda function definition:
+
+```yaml
+service: lambda-authorizers
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, 'prod'}
+  region: ${opt:region, 'eu-central-1'}
+  memorySize: 128
+  timeout: 3
+
+  # Tip: put all your artifacts in a single S3 bucket!
+  deploymentBucket:
+    name: api-artifacts
+    serverSideEncryption: AES256
+
+  environment:
+    JWKS_URI: 'https://danillouz.eu.auth0.com/.well-known/jwks.json'
+    TOKEN_ISSUER: 'https://danillouz.eu.auth0.com/'
+    AUDIENCE: 'https://api.danillouz.dev/account'
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+
+# highlight-start
+functions:
+  auth0BearerAuth:
+    handler: src/auth0.verify
+    description: Verify the bearer token with Auth0
+    timeout: 10
+# highlight-end
+```
+
+To match the function definition, create a file named `auth0.js` in `src`:
+
+```shell
+lambda-authorizers
+  ├── package.json
+  ├── serverless.yaml
+  └── src
+      └── auth0.js # highlight-line
+```
+
+And in `src/auth0.js` export a function named `verify`:
+
+```js
+'use strict';
+
+module.exports.verify = async event => {
+  try {
+    // Lambda Authorizer implementation goes here.
+  } catch (err) {
+    console.log('Authorizer Error: ', err);
+
+    // The Error MUST be "Unauthorized" (EXACTLY!) for APIG to return a 401.
+    throw new Error('Unauthorized');
+  }
+};
+```
+
+If something goes "wrong" in the Lambda Authorizer, we'll log the error and throw a new `Unauthorized` error. This will make APIG return a `401 Unauthorized` response back to the caller.
+
+The Lambda Authorizer will first have to extract the bearer token from the `Authorization` request header. Create a helper function for that in `src/get-token.js`:
+
+```shell
+lambda-authorizers
+  ├── package.json
+  ├── serverless.yaml
+  └── src
+      ├── auth0.js
+      └── get-token.js # highlight-line
+```
+
+```js
+'use strict';
+
+module.exports = function getToken(event) {
+  if (event.type !== 'TOKEN') {
+    throw new Error('Authorizer must be of type "TOKEN"');
+  }
+
+  const { authorizationToken: bearer } = event;
+  if (!bearer) {
+    throw new Error(
+      'Authorization header with "Bearer TOKEN" must be provided'
+    );
+  }
+
+  const [, token] = bearer.match(/^Bearer (.*)$/) || [];
+  if (!token) {
+    throw new Error('Invalid bearer token');
+  }
+
+  return token;
+};
+```
+
+Then `require` and call the helper in the Lambda:
+
+```js
+'use strict';
+
+const getToken = require('./get-token'); // highlight-line
+
+module.exports.verify = async event => {
+  try {
+    const token = getToken(event); // highlight-line
+  } catch (err) {
+    console.log('Authorizer Error: ', err);
+
+    // The Error MUST be "Unauthorized" (EXACTLY!) for APIG to return a 401.
+    throw new Error('Unauthorized');
+  }
+};
+```
+
+Now we have the token, we need to verify it with Auth0. Part of the veryfication process is fetching the JWKS from Auth0, and the `jwks-rsa` npm module can help with that by creating a client:
+
+```js
+'use strict';
+
+const jwksRSA = require('jwks-rsa'); // highlight-line
+const getToken = require('./get-token');
+
+const { JWKS_URI } = process.env; // highlight-line
+
+// highlight-start
+const jwksClient = jwksRSA({
+  cache: true,
+  rateLimit: true,
+  jwksUri: JWKS_URI
+});
+// highlight-end
+
+module.exports.verify = async event => {
+  try {
+    const token = getToken(event);
+  } catch (err) {
+    console.log('Authorizer Error: ', err);
+
+    // The Error MUST be "Unauthorized" (EXACTLY!) for APIG to return a 401.
+    throw new Error('Unauthorized');
+  }
+};
+```
+
+To verify the token, create another helper function in `src/verify-token.js`:
+
+```shell
+lambda-authorizers
+  ├── package.json
+  ├── serverless.yaml
+  └── src
+      ├── auth0.js
+      ├── get-token.js
+      └── verify-token.js # highlight-line
+```
+
+We'll pass the `jwksClient` together with the `TOKEN_ISSUER`, `AUDIENCE` and `token` itself as arguments to the helper function. The helper will first decode the JWT, then fetch the JWKS from Auth0 and finally verify the token signature:
+
+```js
+'use strict';
+
+const util = require('util');
+const jwt = require('jsonwebtoken');
+
+const _getSigningKey = util.promisify(jwksClient.getSigningKey);
+const _verifyJwt = util.promisify(jwt.verify);
+
+module.exports = async function verifyToken(
+  jwksClient,
+  issuer,
+  audience,
+  token
+) {
+  const decoded = jwt.decode(token, { complete: true });
+
+  if (!decoded || !decoded.header || !decoded.header.kid) {
+    throw new Error('Invalid JWT');
+  }
+
+  const { publicKey, rsaPublicKey } = await _getSigningKey(decoded.header.kid);
+  const signingKey = publicKey || rsaPublicKey;
+
+  return _verifyJwt(token, signingKey, {
+    issuer,
+    audience
+  });
+};
+```
+
+Now `require` and call the helper function in the Lambda:
+
+```js
+'use strict';
+
+const jwksRSA = require('jwks-rsa');
+const getToken = require('./get-token');
+const verifyToken = require('./verify-token'); // highlight-line
+
+const {
+  JWKS_URI,
+  TOKEN_ISSUER, // highlight-line
+  AUDIENCE // highlight-line
+} = process.env;
+
+const jwksClient = jwksRSA({
+  cache: true,
+  rateLimit: true,
+  jwksUri: JWKS_URI
+});
+
+module.exports.verify = async event => {
+  try {
+    const token = getToken(event);
+    // highlight-start
+    const verifiedData = await verifyToken(
+      jwksClient,
+      token,
+      TOKEN_ISSUER,
+      AUDIENCE
+    );
+    // highlight-end
+  } catch (err) {
+    console.log('Authorizer Error: ', err);
+
+    // The Error MUST be "Unauthorized" (EXACTLY!) for APIG to return a 401.
+    throw new Error('Unauthorized');
+  }
+};
+```
+
+This returns some data we can use to create the authorization response:
+
+```js
+'use strict';
+
+const jwksRSA = require('jwks-rsa');
+const getToken = require('./get-token');
+const verifyToken = require('./verify-token');
+
+const { JWKS_URI, TOKEN_ISSUER, AUDIENCE } = process.env;
+
+const jwksClient = jwksRSA({
+  cache: true,
+  rateLimit: true,
+  jwksUri: JWKS_URI
+});
+
+module.exports.verify = async event => {
+  try {
+    const token = getToken(event);
+    const verifiedData = await verifyToken(
+      jwksClient,
+      token,
+      TOKEN_ISSUER,
+      AUDIENCE
+    );
+
+    // highlight-start
+    const userId = verifiedData.sub;
+
+    const authRes = {
+      principalId: userId,
+      policyDocument: {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Action: 'execute-api:Invoke',
+            Effect: 'Allow',
+            Resource: event.methodArn
+          }
+        ]
+      },
+      context: {
+        scope: verifiedData.scope
+      }
+    };
+
+    return authRes;
+    // highlight-end
+  } catch (err) {
+    console.log('Authorizer Error: ', err);
+
+    // The Error MUST be "Unauthorized" (EXACTLY!) for APIG to return a 401.
+    throw new Error('Unauthorized');
+  }
+};
+```
+
+A caveat regarding the `context` object is that you can _not_ set a JSON object or array as a valid value of any key. It must be either a `String`, `Number` or `Boolean`:
+
+```js
+context: {
+  a: 'value', // OK
+  b: 1, // OK
+  c: true, // OK
+  d: [9, 8, 7], // Will NOT be serialized
+  e: { x: 'value', y: 99, z: false } // Will NOT be serialized
+}
+```
+
+Finally add a release command to the `package.json`:
+
+```json
+{
+  "name": "lambda-authorizers",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "release": "serverless deploy --stage prod" // highlight-line
+  },
+  "keywords": [],
+  "author": "Daniël Illouz",
+  "license": "MIT",
+  "dependencies": {
+    "jsonwebtoken": "^8.5.1",
+    "jwks-rsa": "^1.5.1"
+  },
+  "devDependencies": {
+    "serverless": "^1.45.1"
+  }
+}
+```
+
+And release the Lambda:
+
+```sh
+npm run release
+```
+
+Serverless will now put it live:
+
+```
+
+```
+
+Take note of the ARN, which is needed to configure the API.
+
 ## In closing
 
 In this post I focused on the backend and showed you a way to implement "serverless auth". But it's fairly easy to use something like <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> and secure the frontend as well.
