@@ -20,7 +20,8 @@ More specifically:
 - The API endpoints are protected with a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">bearer token</a> and implemented as <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html" target="_blank" rel="noopener noreferrer">Lambda Proxy Integrations</a> (i.e. Lambda handlers).
 - The Lambda handlers are implemented using <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> and the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>.
 - <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a> is used as a third party auth provider.
-- An <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">APIG Lambda Authorizer</a> is used to verify the bearer token with Auth0.
+- An <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">APIG Lambda Authorizer</a> is used to verify the token with Auth0.
+- <a href="https://en.wikipedia.org/wiki/CURL" target="_blank" rel="noopener noreferrer">cURL</a> (`curl`) is used as the client to send HTTP requests to the API with a token.
 
 ## Why use a third party auth provider?
 
@@ -253,7 +254,7 @@ To summarize, we need the following components to protect our API:
 - AWS APIG to represent the Account API.
 - A Lambda Authorizer to verify tokens with Auth0.
 - A Lambda handler for the `GET /profile` endpoint to return the profile data.
-- `curl` as the client to send HTTP requests to the API.
+- `curl` as the client to send HTTP requests to the API with a token.
 
 We can visualize how these components will interact with each like this:
 
