@@ -701,13 +701,11 @@ Finally, add a release command to the `package.json`:
 {
   "name": "lambda-authorizers",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "APIG Lambda Authorizers.",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "release": "serverless deploy --stage prod" // highlight-line
   },
-  "keywords": [],
   "author": "Daniël Illouz",
   "license": "MIT",
   "dependencies": {
@@ -759,14 +757,338 @@ layers:
   None
 ```
 
-Now go to the AWS Lambda Console, find `lambda-authorizers-prod-auth0VerifyBearer` under "Functions" and take note of the ARN in the top right corner:
+Now go to the AWS Console and visit the Lambda service. There find `lambda-authorizers-prod-auth0VerifyBearer` under "Functions" and take note of the ARN in the top right corner:
 
 <figure>
   <img src="./img/aws/lambda-authorizer-arn.png" alt="Image that shows where to find the Lambda Auhthorizer ARN in the AWS Lambda Console.">
-  <figcaption>The ARN of the Lambda Authorizer</figcaption>
+  <figcaption>Finding the ARN of the Lambda Authorizer</figcaption>
 </figure>
 
 We'll need this to configure the Account API.
+
+## Implementing the Account API
+
+Similar to the Lambda Authorizer, create a new directory for the code:
+
+```shell
+mkdir account-api
+```
+
+Move to this directory and initialize a new <a href="https://www.npmjs.com/" target="_blank" rel="noopener noreferrer">npm</a> project with:
+
+```shell
+npm init -y
+```
+
+This creates a `package.json` file:
+
+```shell
+account-api
+  └── package.json # highlight-line
+```
+
+Again, we'll use the Serverless Framework to configure and release the Lambda to AWS. Install it as a "dev" dependency:
+
+```shell
+npm i -D serverless
+```
+
+Create a `serverless.yaml` manifest:
+
+```shell
+account-api
+  ├── node_modules
+  ├── package-lock.json
+  ├── package.json
+  └── serverless.yaml # highlight-line
+```
+
+With the following contents:
+
+```yaml
+service: account-api
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, 'prod'}
+  region: ${opt:region, 'eu-central-1'}
+  memorySize: 128
+  timeout: 3
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+```
+
+Add the Lambda function definition for the `GET /profile` endpoint handler:
+
+```yaml
+service: account-api
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, 'prod'}
+  region: ${opt:region, 'eu-central-1'}
+  memorySize: 128
+  timeout: 3
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+
+# highlight-start
+functions:
+  getProfile:
+    handler: src/handler.getProfile
+    description: Gets the user profile data
+    events:
+      - http:
+          path: /profile
+          method: get
+# highlight-end
+```
+
+In order to match the Lambda function definition, create a file named `handler.js` in `src`:
+
+```shell
+account-api
+  ├── node_modules
+  ├── package-lock.json
+  ├── package.json
+  ├── serverless.yaml
+  └── src
+      └── handler.js # highlight-line
+```
+
+And in `src/handler.js` export a function named `getProfile`:
+
+```js
+'use strict';
+
+module.exports.getProfile = async event => {
+  const profileData = {
+    name: 'Daniël'
+  };
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify(profileData)
+  };
+};
+```
+
+This is actually all we need in order for our endpoint to return the profile data. Before we protect the endpoint, lets release it to see if it works.
+
+Add a release command to the `package.json`:
+
+```json
+{
+  "name": "account-api",
+  "version": "1.0.0",
+  "description": "Account API that returns a user profile.",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "release": "serverless deploy --stage prod" // highlight-line
+  },
+  "author": "Daniël Illouz",
+  "license": "MIT",
+  "devDependencies": {
+    "serverless": "^1.45.1"
+  }
+}
+```
+
+Release the Lambda with:
+
+```shell
+npm run release
+```
+
+Sit back and relax:
+
+```shell
+Serverless: Packaging service...
+Serverless: Excluding development dependencies...
+Serverless: Creating Stack...
+Serverless: Checking Stack create progress...
+.....
+Serverless: Stack create finished...
+Serverless: Uploading CloudFormation file to S3...
+Serverless: Uploading artifacts...
+Serverless: Uploading service account-api.zip file to S3 (374 B)...
+Serverless: Validating template...
+Serverless: Updating Stack...
+Serverless: Checking Stack update progress...
+..............................
+Serverless: Stack update finished...
+Service Information
+service: account-api
+stage: prod
+region: eu-central-1
+stack: account-api-prod
+resources: 10
+api keys:
+  None
+endpoints:
+  GET - https://9jwhywe1n7.execute-api.eu-central-1.amazonaws.com/prod/profile # highlight-line
+functions:
+  getProfile: account-api-prod-getProfile
+layers:
+  None
+```
+
+Now try to send a request to the endpoint that has been created for you. For example:
+
+```shell
+curl https://9jwhywe1n7.execute-api.eu-central-1.amazonaws.com/prod/profile
+```
+
+It should return:
+
+```json
+{ "name": "Daniël" }
+```
+
+Now we know the endpoint is working, we'll protect it by adding a custom `authorizer` property in the `serverless.yaml` manifest:
+
+```yaml
+service: account-api
+
+# highlight-start
+custom:
+  authorizer:
+    arn: arn: aws:lambda:eu-central-1:ACCOUNT_ID:function:lambda-authorizers-prod-auth0VerifyBearer
+    resultTtlInSeconds: 0
+    identitySource: method.request.header.Authorization
+    identityValidationExpression: '^Bearer [-0-9a-zA-z\.]*$'
+    type: token
+# highlight-end
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, 'prod'}
+  region: ${opt:region, 'eu-central-1'}
+  memorySize: 128
+  timeout: 3
+  profile: danillouz
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+
+functions:
+  getProfile:
+    handler: src/handler.getProfile
+    description: Gets the user profile
+    events:
+      - http:
+          path: /profile
+          method: get
+```
+
+Lets go over the `authorizer` properties:
+
+- `arn`: must be the value of the Lambda Authorizer ARN we released and found in the AWS Lambda console.
+- `resultTtlInSeconds`: used to cache the IAM policy document returned from the Lambda Authorizer. When enabled (caching is disabled when set to `0`) and a policy document has been cached, the Lambda Authorizer wont be executed. According to the <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/configure-api-gateway-lambda-authorization-with-console.html" target="_blank" rel="noopener noreferrer">AWS docs</a> the default value is `300` seconds and the max value is `3600` seconds.
+- `identitySource`: where APIG should "look" for the bearer token.
+- `identityValidationExpression`: the expression used to extract the bearer token from the `identitySource`.
+
+Now we only have to configure our endpoint to use the Lambda Authorizer:
+
+```yaml
+service: account-api
+
+custom:
+  authorizer:
+    arn: arn: aws:lambda:eu-central-1:ACCOUNT_ID:function:lambda-authorizers-prod-auth0VerifyBearer
+    resultTtlInSeconds: 0
+    identitySource: method.request.header.Authorization
+    identityValidationExpression: '^Bearer [-0-9a-zA-z\.]*$'
+    type: token
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, 'prod'}
+  region: ${opt:region, 'eu-central-1'}
+  memorySize: 128
+  timeout: 3
+  profile: danillouz
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+
+functions:
+  getProfile:
+    handler: src/handler.getProfile
+    description: Gets the user profile
+    events:
+      - http:
+          path: /profile
+          method: get
+          authorizer: ${self:custom.authorizer} # highlight-line
+```
+
+And do another release:
+
+```
+npm run release
+```
+
+After Serverless finishes, go to the AWS Console and visit the API Gateway service. There click on "prod-account-api" and then the "GET" resource under "profile". You should now see that the "Method Request" tile has a property "Auth" set to `auth0VerifyBearer`:
+
+<figure>
+  <img src="./img/aws/apig-lambdas.png" alt="Image that shows the API Gateway resource configuration.">
+  <figcaption>The resource is configured with a custom authorization scheme.</figcaption>
+</figure>
+
+This means our `GET /profile` endpoint is properly configured with a Lambda Authorizer. And we now require a bearer token to get the profile data. Lets verify this by making the same `curl` request like before (without a token):
+
+```shell
+curl https://9jwhywe1n7.execute-api.eu-central-1.amazonaws.com/prod/profile
+```
+
+It returns:
+
+```json
+{ "message": "Unauthorized" }
+```
+
+Great, now try the `curl` command from the Auth0 API details "Test" tab (with a token), but set the URL of our profile endpoint:
+
+```
+curl --request GET \
+  --url https://9jwhywe1n7.execute-api.eu-central-1.amazonaws.com/prod/profile \
+  --header 'authorization: Bearer eyJ0q..Y3HZ'
+```
+
+This returns the profile data again:
+
+```json
+{ "name": "Daniël" }
+```
+
+Nice!
 
 ## In closing
 
