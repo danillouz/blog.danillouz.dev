@@ -311,12 +311,12 @@ lambda-authorizers
 The following npm dependencies are required:
 
 ```shell
-npm i jwks-rsa jsonwebtoken
+npm i jsonwebtoken jwks-rsa
 ```
 
-The <a href="https://github.com/auth0/node-jwks-rsa" target="_blank" rel="noopener noreferrer">jwks-rsa</a> library will help us fetch the JWKS from Auth0. And the <a href="https://github.com/auth0/node-jsonwebtoken" target="_blank" rel="noopener noreferrer">jsonwebtoken</a> library will help use decode the JWT (i.e. the bearer token) and verify the token signature, [issuer and audience](#registering-the-api-with-auth0) claims.
+The <a href="https://github.com/auth0/node-jsonwebtoken" target="_blank" rel="noopener noreferrer">jsonwebtoken</a> library will help use decode the JWT (i.e. the bearer token) and verify the token signature, [issuer and audience](#registering-the-api-with-auth0) claims. The <a href="https://github.com/auth0/node-jwks-rsa" target="_blank" rel="noopener noreferrer">jwks-rsa</a> library will help us fetch the JWKS from Auth0.
 
-We'll use the Serverless Framework to configure and release the Lambda to AWS. Install it as a "dev" dependency:
+We'll use the Serverless Framework to configure and release the Lambda to AWS, so install it as a "dev" dependency:
 
 ```shell
 npm i -D serverless
@@ -332,7 +332,7 @@ lambda-authorizers
   └── serverless.yaml # highlight-line
 ```
 
-With the following contents:
+With the following content:
 
 ```yaml
 service: lambda-authorizers
@@ -354,7 +354,7 @@ package:
     - src
 ```
 
-Add the (public) [Auth0 auth properties](#registering-the-api-with-auth0) as environment variables:
+Add the properties we configured when [registering the API with Auth0](#registering-the-api-with-auth0) as environment variables:
 
 ```yaml
 service: lambda-authorizers
@@ -382,7 +382,7 @@ package:
     - src
 ```
 
-Add the Lambda function definition:
+And the Lambda function definition:
 
 ```yaml
 service: lambda-authorizers
@@ -445,7 +445,7 @@ module.exports.verifyBearer = async event => {
 };
 ```
 
-If something goes "wrong" in the Lambda, we'll log the error and throw a new `Unauthorized` error. This will make APIG return a `401 Unauthorized` response back to the caller. Note that the throwed error _must_ match the string `'Unauthorized'` _exactly_ for this to work.
+If something goes "wrong" in the Lambda, we'll log the error and throw a new `Unauthorized` error. This will make APIG return a `401 Unauthorized` response back to the caller. Note that the thrown error _must_ match the string `'Unauthorized'` _exactly_ for this to work.
 
 The Lambda will first have to get the bearer token from the `Authorization` request header. Create a helper function for that named `getToken` in `src/get-token.js`:
 
@@ -502,36 +502,7 @@ module.exports.verifyBearer = async event => {
 };
 ```
 
-Now we have the token, we need to verify it. Part of the verification process is fetching the JWKS from Auth0. And the `jwks-rsa` library can help with that, by creating a client to fetch the public key:
-
-```js
-'use strict';
-
-const jwksRSA = require('jwks-rsa'); // highlight-line
-const getToken = require('./get-token');
-
-const { JWKS_URI } = process.env; // highlight-line
-
-// highlight-start
-const jwksClient = jwksRSA({
-  cache: true,
-  rateLimit: true,
-  jwksUri: JWKS_URI
-});
-// highlight-end
-
-module.exports.verifyBearer = async event => {
-  try {
-    const token = getToken(event);
-  } catch (err) {
-    console.log('Authorizer Error: ', err);
-
-    throw new Error('Unauthorized');
-  }
-};
-```
-
-To verify the token, create another helper function named `verifyToken` in `src/verify-token.js`:
+Now we have the token, we need to verify it. We'll use a helper function named `verifyToken` for that in `src/verify-token.js`:
 
 ```shell
 lambda-authorizers
@@ -545,34 +516,38 @@ lambda-authorizers
       └── verify-token.js # highlight-line
 ```
 
-We'll pass the `jwksClient` together with the `TOKEN_ISSUER`, `AUDIENCE` and `token` itself as arguments when we call the `verifyToken` helper function.
+This helper will do 3 things:
 
-The `token` is a JWT and the helper will first decode it. Then it will fetch the JWKS from Auth0 and using the <a href="https://community.auth0.com/t/what-is-the-origin-of-the-kid-claim-in-the-jwt/8431" target="_blank" rel="noopener noreferrer">kid</a> JWT claim, the library can find out which key from the returned JWKS was used to sign the token. Finally, the token signature, issuer and audience claims can be verified by the library:
+1. Decode the JWT.
+2. Fetch the signing key from Auth0 using the JWKS URI.
+
+> Using the <a href="https://community.auth0.com/t/what-is-the-origin-of-the-kid-claim-in-the-jwt/8431" target="_blank" rel="noopener noreferrer">kid</a> JWT claim, we can find out which key from the returned JWKS was used to sign the token.
+
+3. Verify the token signature, the issuer and audience claims.
 
 ```js
 'use strict';
 
-const util = require('util');
-const jwt = require('jsonwebtoken');
-
-const verifyJwt = util.promisify(jwt.verify);
-
 module.exports = async function verifyToken(
-  jwksClient,
+  token,
+  decodeJwt,
+  getSigningKey,
+  verifyJwt,
   issuer,
-  audience,
-  token
+  audience
 ) {
-  const decoded = jwt.decode(token, { complete: true });
+  // Step 1
+  const decoded = decodeJwt(token, { complete: true });
 
   if (!decoded || !decoded.header || !decoded.header.kid) {
     throw new Error('Invalid JWT');
   }
 
-  const getSigningKey = util.promisify(jwksClient.getSigningKey);
+  // Step 2
   const { publicKey, rsaPublicKey } = await getSigningKey(decoded.header.kid);
   const signingKey = publicKey || rsaPublicKey;
 
+  // Step 3
   return verifyJwt(token, signingKey, {
     issuer,
     audience
@@ -580,14 +555,105 @@ module.exports = async function verifyToken(
 };
 ```
 
-Now `require` and call the helper function in the Lambda:
+First require the helper in the Lambda and pass the `token` as the first argument when calling it:
 
 ```js
 'use strict';
 
-const jwksRSA = require('jwks-rsa');
 const getToken = require('./get-token');
 const verifyToken = require('./verify-token'); // highlight-line
+
+module.exports.verifyBearer = async event => {
+  try {
+    const token = getToken(event);
+    const verifiedData = await verifyToken(
+      token // highlight-line
+    );
+  } catch (err) {
+    console.log('Authorizer Error: ', err);
+
+    throw new Error('Unauthorized');
+  }
+};
+```
+
+To decode the token in the helper (step 1), we'll use the `jsonwebtoken` library. It exposes a `decode` method. Pass this method as the second argument when calling the helper:
+
+```js
+'use strict';
+
+const jwt = require('jsonwebtoken'); // highlight-line
+
+const getToken = require('./get-token');
+const verifyToken = require('./verify-token');
+
+module.exports.verifyBearer = async event => {
+  try {
+    const token = getToken(event);
+    const verifiedData = await verifyToken(
+      token,
+      jwt.decode // highlight-line
+    );
+  } catch (err) {
+    console.log('Authorizer Error: ', err);
+
+    throw new Error('Unauthorized');
+  }
+};
+```
+
+To fetch the signing key from Auth0 (step 2) we'll use the `jwks-rsa` library. It exposes a client with `getSigningKey` method to fetch the key. Pas this method as the third argument when calling the helper:
+
+```js
+'use strict';
+
+const util = require('util'); // highlight-line
+
+const jwt = require('jsonwebtoken');
+const jwksRSA = require('jwks-rsa'); // highlight-line
+
+const getToken = require('./get-token');
+const verifyToken = require('./verify-token');
+
+const { JWKS_URI } = process.env; // highlight-line
+
+// highlight-start
+const jwksClient = jwksRSA({
+  cache: true,
+  rateLimit: true,
+  jwksUri: JWKS_URI
+});
+const getSigningKey = util.promisify(jwksClient.getSigningKey);
+// highlight-end
+
+module.exports.verifyBearer = async event => {
+  try {
+    const token = getToken(event);
+    const verifiedData = await verifyToken(
+      token,
+      jwt.decode,
+      getSigningKey // highlight-line
+    );
+  } catch (err) {
+    console.log('Authorizer Error: ', err);
+
+    throw new Error('Unauthorized');
+  }
+};
+```
+
+Finally, to verify the token signature, issuer and audience claims (step 3) we'll use the `jsonwebtoken` library again. It exposes a `verify` method. Pass this method together with the `TOKEN_ISSUER` and `AUDIENCE` as the final arguments when calling the helper:
+
+```js
+'use strict';
+
+const util = require('util');
+
+const jwt = require('jsonwebtoken');
+const jwksRSA = require('jwks-rsa');
+
+const getToken = require('./get-token');
+const verifyToken = require('./verify-token');
 
 const {
   JWKS_URI,
@@ -600,18 +666,21 @@ const jwksClient = jwksRSA({
   rateLimit: true,
   jwksUri: JWKS_URI
 });
+const getSigningKey = util.promisify(jwksClient.getSigningKey);
+
+const verifyJwt = util.promisify(jwt.verify); // highlight-line
 
 module.exports.verifyBearer = async event => {
   try {
     const token = getToken(event);
-    // highlight-start
     const verifiedData = await verifyToken(
-      jwksClient,
       token,
-      TOKEN_ISSUER,
-      AUDIENCE
+      jwt.decode,
+      getSigningKey,
+      verifyJwt, // highlight-line
+      TOKEN_ISSUER, // highlight-line
+      AUDIENCE // highlight-line
     );
-    // highlight-end
   } catch (err) {
     console.log('Authorizer Error: ', err);
 
@@ -620,12 +689,30 @@ module.exports.verifyBearer = async event => {
 };
 ```
 
-This returns some `verifiedData`, which we can use to create the `authResponse`:
+When the helper verifies the token, it will return the JWT `Payload` as `verifiedData`:
+
+```json
+{
+  "iss": "https://danillouz.eu.auth0.com/",
+  "sub": "gXGPjvFoQvxjsnh28azhHmcbR7IQH20J@clients",
+  "aud": "https://api.danillouz.dev/account",
+  "iat": 1560521845,
+  "exp": 1560608245,
+  "azp": "gXGPjvFoQvxjsnh28azhHmcbR7IQH20J",
+  "gty": "client-credentials"
+}
+```
+
+We'll use this to create the `authResponse`:
 
 ```js
 'use strict';
 
+const util = require('util');
+
+const jwt = require('jsonwebtoken');
 const jwksRSA = require('jwks-rsa');
+
 const getToken = require('./get-token');
 const verifyToken = require('./verify-token');
 
@@ -636,20 +723,24 @@ const jwksClient = jwksRSA({
   rateLimit: true,
   jwksUri: JWKS_URI
 });
+const getSigningKey = util.promisify(jwksClient.getSigningKey);
+
+const verifyJwt = util.promisify(jwt.verify);
 
 module.exports.verifyBearer = async event => {
   try {
     const token = getToken(event);
     const verifiedData = await verifyToken(
-      jwksClient,
       token,
+      jwt.decode,
+      getSigningKey,
+      verifyJwt,
       TOKEN_ISSUER,
       AUDIENCE
     );
 
     // highlight-start
     const userId = verifiedData.sub;
-
     const authResponse = {
       principalId: userId,
       policyDocument: {
@@ -677,7 +768,28 @@ module.exports.verifyBearer = async event => {
 };
 ```
 
-The `authResponse.principalId` property represents a unique user identifier associated with the token sent by the client. Auth0 provides this via the JWT `sub` claim.
+The `authResponse.principalId` property represents a unique user identifier associated with the token sent by the client. Auth0 provides this via the JWT `sub` claim and ours has the value:
+
+```json
+{
+  "iss": "https://danillouz.eu.auth0.com/",
+  "sub": "gXGPjvFoQvxjsnh28azhHmcbR7IQH20J@clients", // highlight-line
+  "aud": "https://api.danillouz.dev/account",
+  "iat": 1560521845,
+  "exp": 1560608245,
+  "azp": "gXGPjvFoQvxjsnh28azhHmcbR7IQH20J",
+  "gty": "client-credentials"
+}
+```
+
+Note that it's postfixed with `@clients`. This is because Auth0 automatically created a "Test Application" for us when we registered the Account API with them. And it's via this client (or application) that we obtain the test token (using the client credentials grant to be specific).
+
+In this case the client represents a "machine" and not a user. But that's fine because the machine has a unique identifier (the same way a user would have) by means of a client ID. You can find the test application in the Auth0 dashboard by clicking on "Application" and selecting "Account API (Test Application)":
+
+<figure>
+  <img src="./img/auth0/test-application.png" alt="Image that shows the Auth0 Test Application.">
+  <figcaption>The client ID is <code class="language-text">gXGPjvFoQvxjsnh28azhHmcbR7IQH20J</code> which matches the JWT <code class="language-text">sub</code> claim.</figcaption>
+</figure>
 
 We can obtain the ARN of the Lambda handler of the originally called endpoint via `event.methodArn`. APIG will use this ARN to invoke said Lambda handler--in our case this will be the Lambda handler that gets the profile data.
 
@@ -787,7 +899,7 @@ account-api
   └── package.json # highlight-line
 ```
 
-Again, we'll use the Serverless Framework to configure and release the Lambda to AWS. Install it as a "dev" dependency:
+Again, we'll use the Serverless Framework to configure and release the Lambda to AWS, so install it as a "dev" dependency:
 
 ```shell
 npm i -D serverless
@@ -803,7 +915,7 @@ account-api
   └── serverless.yaml # highlight-line
 ```
 
-With the following contents:
+With the following content:
 
 ```yaml
 service: account-api
@@ -875,7 +987,7 @@ And in `src/handler.js` export a function named `getProfile`:
 ```js
 'use strict';
 
-module.exports.getProfile = async event => {
+module.exports.getProfile = async () => {
   const profileData = {
     name: 'Daniël'
   };
@@ -887,9 +999,9 @@ module.exports.getProfile = async event => {
 };
 ```
 
-This is actually all we need in order for our endpoint to return the profile data. Before we protect the endpoint, lets release it to see if it works.
+The Lambda handler returns an <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-output-format" target="_blank" rel="noopener noreferrer">HTTP output</a> object with the profile data as JSON.
 
-Add a release command to the `package.json`:
+And this is actually all we need. Before we protect the endpoint, lets release it to see if it works. Add a release command to the `package.json`:
 
 ```json
 {
@@ -908,7 +1020,7 @@ Add a release command to the `package.json`:
 }
 ```
 
-Release the Lambda with:
+And release the Lambda with:
 
 ```shell
 npm run release
