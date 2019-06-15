@@ -1300,9 +1300,9 @@ When the Lambda Authorizer throws an error or returns a "Deny" policy, APIG won'
 
 ## In closing
 
-In this post I focused on the backend and showed you a way to implement "serverless auth". But it's fairly easy to use something like <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> and secure the frontend as well.
+In this post I showed you a way to implement "serverless auth" on the backend. But it's fairly easy to use something like <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> and also secure the frontend.
 
-This will allow your users to signup/login to (for example) your web app and get a token from Auth0. The web app can then use the token to send requests on behalf of the user to a protected API. In fact, you can reuse the Lambda Authorizer implementation in this post for that!
+This will allow your users to signup/login to (for example) your web app, and get a token from Auth0. The web app can then use the token to send requests on behalf of the user to a protected API. In fact, you can reuse the Lambda Authorizer implementation in this post for that.
 
 I've implemented this in several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result. Let me know if you'd be interested to learn more about that and I might write a follow-up that focuses on the frontend implementation.
 
