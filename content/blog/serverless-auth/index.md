@@ -10,6 +10,8 @@ On top of that, it can also be challenging to know when to use what. Depending o
 
 I won't be covering these protocols and strategies in depth. Instead, I want to show you that implementing something as complex as auth can be quite simple. In order to do that, I'll focus on a specific (but common) use case. And show you how it can be implemented, using a specific set of (serverless) technologies.
 
+If you just want to read the code, head over to <a href="https://github.com/danillouz/serverless-auth" target="_blank" rel="noopener noreferrer">this GitHub repo</a>.
+
 ## Use case and technologies
 
 > How can we secure an HTTP API with a token based auth strategy. So only authenticated- and authorized users can access it via a (web) client?
@@ -1296,10 +1298,6 @@ resources:
 
 When the Lambda Authorizer throws an error or returns a "Deny" policy, APIG won't execute any Lambda handlers. This means that the CORS settings you added to the Lambda handler wont be applied. That's why we must define additional APIG response resources, to make sure we always return the proper CORS headers.
 
-You can find all code in <a href="https://github.com/danillouz/serverless-auth" target="_blank" rel="noopener noreferrer">this GitHub repo</a>
-
-And that's it!
-
 ## In closing
 
 In this post I focused on the backend and showed you a way to implement "serverless auth". But it's fairly easy to use something like <a href="https://auth0.com/lock" target="_blank" rel="noopener noreferrer">Auth0 Lock</a> and secure the frontend as well.
@@ -1307,3 +1305,5 @@ In this post I focused on the backend and showed you a way to implement "serverl
 This will allow your users to signup/login to (for example) your web app and get a token from Auth0. The web app can then use the token to send requests on behalf of the user to a protected API. In fact, you can reuse the Lambda Authorizer implementation in this post for that!
 
 I've implemented this in several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result. Let me know if you'd be interested to learn more about that and I might write a follow-up that focuses on the frontend implementation.
+
+You can find all code in <a href="https://github.com/danillouz/serverless-auth" target="_blank" rel="noopener noreferrer">this GitHub repo</a>.
