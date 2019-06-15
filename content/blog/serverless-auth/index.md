@@ -1226,7 +1226,79 @@ This returns the profile data again:
 { "name": "Daniël" }
 ```
 
-Nice!
+Nice, we successfully secured our API with a token based auth strategy!
+
+## CORS headers
+
+On a final note, when your API needs to return <a href="https://serverless.com/blog/cors-api-gateway-survival-guide" target="_blank" rel="noopener noreferrer">CORS headers</a>, make sure to add a <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/supported-gateway-response-types.html" target="_blank" rel="noopener noreferrer">custom API Gateway Response</a> as well:
+
+```yaml
+service: account-api
+
+custom:
+  authorizer:
+    arn: arn: aws:lambda:eu-central-1:ACCOUNT_ID:function:lambda-authorizers-prod-auth0VerifyBearer
+    resultTtlInSeconds: 0
+    identitySource: method.request.header.Authorization
+    identityValidationExpression: '^Bearer [-0-9a-zA-z\.]*$'
+    type: token
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, 'prod'}
+  region: ${opt:region, 'eu-central-1'}
+  memorySize: 128
+  timeout: 3
+  profile: danillouz
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+
+functions:
+  getProfile:
+    handler: src/handler.getProfile
+    description: Gets the user profile
+    events:
+      - http:
+          path: /profile
+          method: get
+          authorizer: ${self:custom.authorizer}
+
+# highlight-start
+resources:
+  Resources:
+    GatewayResponseDefault4XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
+    GatewayResponseDefault5XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_5XX
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
+# highlight-end
+```
+
+When the Lambda Authorizer throws an error or returns a "Deny" policy, APIG won't execute any Lambda handlers. This means that the CORS settings you added to the Lambda handler wont be applied. That's why we must define additional APIG response resources, to make sure we always return the proper CORS headers.
+
+You can find all code in <a href="https://github.com/danillouz/serverless-auth" target="_blank" rel="noopener noreferrer">this GitHub repo</a>
+
+And that's it!
 
 ## In closing
 
