@@ -138,25 +138,6 @@ You can also find these values in the "Quick Start" section of the Auth0 API det
   <figcaption>Find your public auth properties.</figcaption>
 </figure>
 
-### Getting a test token
-
-We can get a test token by navigating to the "Test" tab in the Auth0 API details screen:
-
-<figure>
-  <img src="./img/auth0/test.png" alt="Image that shows where to get a test token in the Auth0 UI.">
-  <figcaption>Get a generated test token for you API.</figcaption>
-</figure>
-
-And if you scroll to the bottom, you'll see a `curl` command displayed with a ready to use test token:
-
-```
-curl --request GET \
-  --url http://path_to_your_api/ \
-  --header 'authorization: Bearer eyJ...lKw
-```
-
-Pretty cool right! We'll use this command after we implement the Lambda Authorizer and the Account API.
-
 ## What's a Lambda Authorizer?
 
 I haven't explained what a Lambda Authorizer is yet. In short, it's a feature of APIG to control access to an API. The AWS <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">docs</a> say:
@@ -326,15 +307,15 @@ Great, now the easy part, writing the code!
 
 We'll do this by:
 
-1. [Setting up a project](#1-setting-up-a-project)
+1. [Setting up the project](#1-setting-up-the-project)
 2. [Configuring a Serverless manifest](#2-configuring-a-serverless-manifest)
-3. [Defining the Lambda](#3-defining-the-lambda)
+3. [Defining the Lambda Authorizer](#3-defining-the-lambda-authorizer)
 4. [Getting the token](#4-getting-the-token)
 5. [Verifying the token](#5-verifying-the-token)
 6. [Creating the auth response](#6-creating-the-auth-response)
-7. [Releasing the Lambda](#7-releasing-the-lambda)
+7. [Releasing the Lambda Authorizer](#7-releasing-the-lambda-authorizer)
 
-### 1. Setting up a project
+### 1. Setting up the project
 
 Create a new directory for the code:
 
@@ -466,7 +447,7 @@ functions:
 
 That's it for the Serverless manifest. You can find more information about it in the <a href="https://serverless.com/framework/docs/providers/aws/guide/serverless.yml/" target="_blank" rel="noopener noreferrer">docs</a>.
 
-### 3. Defining the Lambda
+### 3. Defining the Lambda Authorizer
 
 In order to match the Lambda function definition in the Serverless manifest, create a file named `auth0.js` in `src`:
 
@@ -885,7 +866,7 @@ const authResponse = {
 };
 ```
 
-### 7. Releasing the Lambda
+### 7. Releasing the Lambda Authorizer
 
 Finally, add a release command to the `package.json`:
 
@@ -960,6 +941,17 @@ We'll need this to configure the Account API in the next part.
 
 ## Implementing the Account API
 
+We'll do this by:
+
+1. [Setting up the API project](#1-setting-up-the-api-project)
+2. [Configuring the Serverless manifest](#2-configuring-the-serverless-manifest)
+3. [Defining the Lambda handler](#3-defining-the-lambda-handler)
+4. [Releasing the API](#4-releasing-the-api)
+5. [Configuring the Lambda Authorizer](#5-configuring-the-lambda-authorizer)
+6. [Getting a test token](#6-getting-a-test-token)
+
+### 1. Setting up the API project
+
 Similar to the Lambda Authorizer, create a new directory for the code:
 
 ```shell
@@ -985,7 +977,9 @@ Again, we'll use the Serverless Framework to configure and upload the Lambda to 
 npm i -D serverless
 ```
 
-Create a `serverless.yaml` manifest:
+### 2. Configuring the Serverless manifest
+
+Create a `serverless.yaml` manifest file:
 
 ```shell
 account-api
@@ -995,7 +989,7 @@ account-api
   └── serverless.yaml # highlight-line
 ```
 
-With the following content:
+Add the following content to it:
 
 ```yaml
 service: account-api
@@ -1050,7 +1044,9 @@ functions:
 # highlight-end
 ```
 
-In order to match the Lambda function definition, create a file named `handler.js` in `src`:
+### 3. Defining the Lambda handler
+
+In order to match the Lambda function definition in the Serverless manigest, create a file named `handler.js` in `src`:
 
 ```shell
 account-api
@@ -1082,6 +1078,8 @@ module.exports.getProfile = async () => {
 The Lambda handler returns an <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-output-format" target="_blank" rel="noopener noreferrer">HTTP output</a> object with the profile data as JSON.
 
 And this is actually all we need. Before we protect the endpoint, lets release it to see if we can call it.
+
+### 4. Releasing the API
 
 Add a release command to the `package.json`:
 
@@ -1152,6 +1150,8 @@ It should return:
 ```json
 { "name": "Daniël" }
 ```
+
+### 5. Configuring the Lambda Authorizer
 
 Now we know the endpoint is working, we'll protect it by adding a custom `authorizer` property in the `serverless.yaml` manifest:
 
@@ -1245,7 +1245,7 @@ functions:
 
 And do another release:
 
-```
+```shell
 npm run release
 ```
 
@@ -1262,27 +1262,44 @@ This means our `GET /profile` endpoint is properly configured with a Lambda Auth
 curl https://9jwhywe1n7.execute-api.eu-central-1.amazonaws.com/prod/profile
 ```
 
-It returns:
+It should return:
 
 ```json
 { "message": "Unauthorized" }
 ```
 
-Great, now try the `curl` command from the Auth0 API details "Test" tab (with a token), but set the URL to your profile endpoint. For example:
+### 6. Getting a test token
 
+We can get a test token from the Auth0 dashboard, by navigating to the "Test" tab in the API details screen:
+
+<figure>
+  <img src="./img/auth0/test.png" alt="Image that shows where to get a test token in the Auth0 UI.">
+  <figcaption>Get a generated test token for you API.</figcaption>
+</figure>
+
+If you scroll to the bottom, you'll see a `curl` command displayed with a ready to use test token:
+
+```shell
+curl --request GET \
+  --url http://path_to_your_api/ \
+  --header 'authorization: Bearer eyJ...lKw'
 ```
+
+Pretty cool right! Use this, but set the URL to your profile endpoint. For example:
+
+```shell
 curl --request GET \
   --url https://9jwhywe1n7.execute-api.eu-central-1.amazonaws.com/prod/profile \
-  --header 'authorization: Bearer eyJ0q..Y3HZ'
+  --header 'authorization: Bearer eyJ...lKw'
 ```
 
-This returns the profile data again:
+This should return the profile data again:
 
 ```json
 { "name": "Daniël" }
 ```
 
-Nice, we successfully secured our API with a token based auth strategy!
+Awesome! We successfully secured our API with a token based auth strategy!
 
 ## CORS headers
 
