@@ -127,7 +127,7 @@ Now that our API is registered with Auth0, we need to take note of the following
 - JWKS URI: this returns a <a href="https://auth0.com/docs/jwks" target="_blank" rel="noopener noreferrer">JSON Web Key Set (JWKS)</a>. The URI will be used by the Lambda Authorizer to fetch a public key from Auth0 and verify the token (more on that later). It always has the format `https://TENANT_NAME.REGION.auth0.com/.well-known/jwks.json`. For example `https://danillouz.eu.auth0.com/.well-known/jwks.json`.
 - Audience: this is the "Identifier" you provided during registration (step 3). For example `https://api.danillouz.dev/account`. Note that this doesn't have to be a "real" endpoint.
 
-You can also find these values in the "Quick Start" section of the Auth0 API details screen (you were redirected there after registering the API). For example, click on the "Node.js" tab and look for these properties:
+You can also find these values under the "Quick Start" tab of the API details screen (you were redirected there after registering the API). For example, click on the "Node.js" tab and look for these properties:
 
 - `issuer`
 - `jwksUri`
@@ -199,14 +199,31 @@ This will make APIG respond with `403 Forbidden`. Or you may return an `Unauthor
 
 I found it good practice to only _authenticate_ the caller from the Lambda Authorizer and apply _authorization_ logic _downstream_.
 
-This may not be feasible in all use cases, but doing this keeps your Lambda Authorizer _simple_. Because it will only be responsible for:
+This may not be feasible in all use cases, but doing this keeps the Lambda Authorizer _simple_. Because it will only be responsible for:
 
 - Verifying the token.
 - Propagating authorization information downstream.
 
-The downstream Lambda handler will then use the authorization information to decide if it should execute its "business logic" for the specific caller. And following this design also leads to a nice "decoupling" between the authentication- and authorization logic, i.e. between the Lambda Authorizer and Lambda handlers.
+The downstream Lambda handler will then use the authorization information to decide if it should execute its "business logic" for the specific caller.
 
-You can propagate authorization information by returning a `context` object in the Lambda Authorizer's response:
+Following this design also leads to a nice "decoupling" between the authentication- and authorization logic, i.e. between the Lambda Authorizer and Lambda handlers.
+
+#### Scopes
+
+When using OAuth 2.0, scopes can be used to apply authorization logic. In our case we could have a `get:profile` scope. And a Lambda handler can check if the caller has been authorized to perform the action that is represented by the scope. If not, the Lambda handler can return a `403 Forbidden` response back to the caller.
+
+You can configure scope in the Auth0 dashboard by adding _permissions_ to the registerd API. Navigate to the "Permissions" tab of the API details screen and define `get:profile` as a scope:
+
+<figure>
+  <img src="./img/auth0/api-permissions.png" alt="Image of the Auth0 API permissions tab.">
+  <figcaption>We'll use the configured scope when implementing and testing the Account API.</figcaption>
+</figure>
+
+You can read more about scopes in the Auth0 <a href="https://auth0.com/docs/scopes/current" target="_blank" rel="noopener noreferrer">docs</a>.
+
+#### Context
+
+You can propagate authorization information (like scopes) by returning a `context` object in the Lambda Authorizer's response:
 
 ```js
 'use strict';
@@ -255,10 +272,6 @@ module.exports.handler = event => {
   console.log('scope: ', authorizer.scope); // "get:profile"
 };
 ```
-
-When using OAuth 2.0, "scope" can be provided and used to apply authorization logic. In our case we could have a `get:profile` scope. And the Lambda handler could check if the caller has this scope in `authorizer.scope` when executing. If it's not there, it can return a `403 Forbidden`.
-
-I won't show how to configure scope with Auth0, but the <a href="https://auth0.com/docs/scopes/current" target="_blank" rel="noopener noreferrer">docs</a> should point you in the right direction.
 
 ## Solidifying our mental model
 
@@ -826,9 +839,9 @@ The `authResponse.principalId` property must represent a unique (user) identifie
 }
 ```
 
-Note that if you use the Auth0 test token, the `sub` claim will be postfixed with `@clients`. This is because Auth0 automatically created a "Test Application" for us when we registered the Account API with them. And it's via this test application that we obtain the test token--using the <a href="https://auth0.com/docs/flows/concepts/client-credentials">client credentials grant</a> to be specific, as denoted by the `gty` (grant type) claim.
+Note that if you use an Auth0 test token, the `sub` claim will be postfixed with `@clients`. This is because Auth0 automatically created a "Test Application" for us when we registered the Account API with them. And it's via this test application that we obtain a test token--using the <a href="https://auth0.com/docs/flows/concepts/client-credentials">client credentials grant</a> to be specific, as denoted by the `gty` (grant type) claim.
 
-In this case the test application represents a "machine" and _not_ a user. But that's fine because the machine has a unique identifier the same way a user would have (by means of a client ID). This means this implementation will also work when using "user centric" auth flows like the <a href="https://auth0.com/docs/flows/concepts/implicit">implicit grant</a>.
+In this case the test application represents a "machine" and _not_ a user. But that's okay because the machine has a unique identifier the same way a user would have (by means of a client ID). This means this implementation will also work when using "user centric" auth flows like the <a href="https://auth0.com/docs/flows/concepts/implicit">implicit grant</a>.
 
 You can find the test application in the Auth0 dashboard by navigating to "Applications" and selecting "Account API (Test Application)":
 
