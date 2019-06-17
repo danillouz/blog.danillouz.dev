@@ -324,6 +324,18 @@ Great, now the easy part, writing the code!
 
 ## Implementing the Lambda Authorizer
 
+We'll do this by:
+
+1. [Setting up a project](#1-setting-up-a-project)
+2. [Configuring a Serverless manifest](#2-configuring-a-serverless-manifest)
+3. [Defining the Lambda](#3-defining-the-lambda)
+4. [Getting the token](#4-getting-the-token)
+5. [Verifying the token](#5-verifying-the-token)
+6. [Creating the auth response](#6-creating-the-auth-response)
+7. [Releasing the Lambda](#7-releasing-the-lambda)
+
+### 1. Setting up a project
+
 Create a new directory for the code:
 
 ```shell
@@ -357,7 +369,9 @@ We'll use the Serverless Framework to configure and upload the Lambda to AWS, so
 npm i -D serverless
 ```
 
-Create a `serverless.yaml` manifest:
+### 2. Configuring a Serverless manifest
+
+Create a `serverless.yaml` manifest file:
 
 ```shell
 lambda-authorizers
@@ -367,7 +381,7 @@ lambda-authorizers
   └── serverless.yaml # highlight-line
 ```
 
-Add the following content:
+Add the following content to it:
 
 ```yaml
 service: lambda-authorizers
@@ -452,7 +466,9 @@ functions:
 
 That's it for the Serverless manifest. You can find more information about it in the <a href="https://serverless.com/framework/docs/providers/aws/guide/serverless.yml/" target="_blank" rel="noopener noreferrer">docs</a>.
 
-In order to match the Lambda function definition, create a file named `auth0.js` in `src`:
+### 3. Defining the Lambda
+
+In order to match the Lambda function definition in the Serverless manifest, create a file named `auth0.js` in `src`:
 
 ```shell
 lambda-authorizers
@@ -481,6 +497,8 @@ module.exports.verifyBearer = async event => {
 ```
 
 If something goes "wrong" in the Lambda, we'll log the error and throw a new `Unauthorized` error. This will make APIG return a `401 Unauthorized` response back to the caller. Note that the thrown error _must_ match the string `'Unauthorized'` _exactly_ for this to work.
+
+### 4. Getting the token
 
 The Lambda will first have to get the bearer token from the `Authorization` request header. Create a helper function for that in `src/get-token.js`:
 
@@ -540,6 +558,8 @@ module.exports.verifyBearer = async event => {
   }
 };
 ```
+
+### 5. Verifying the token
 
 Now we have the token, we need to verify it. We'll use another helper function for that in `src/verify-token.js`:
 
@@ -745,7 +765,9 @@ When the helper verifies the token, it will return the JWT Payload data as `veri
 }
 ```
 
-We'll use this to create the `authResponse`:
+### 6. Creating the auth response
+
+We'll use the `verifiedData` to create the `authResponse`:
 
 ```js
 'use strict';
@@ -807,6 +829,8 @@ module.exports.verifyBearer = async event => {
 };
 ```
 
+#### Principal ID
+
 The `authResponse.principalId` property must represent a unique (user) identifier associated with the token sent by the client. Auth0 provides this via the JWT `sub` claim and ours has the value:
 
 ```json
@@ -832,7 +856,11 @@ You can find the test application in the Auth0 dashboard by navigating to "Appli
   <figcaption>The client ID is <code class="language-text">gXGPjvFoQvxjsnh28azhHmcbR7IQH20J</code> which matches the JWT <code class="language-text">sub</code> claim.</figcaption>
 </figure>
 
+#### Method ARN
+
 The ARN of the Lambda handler associated with the called endpoint can be obtained from `event.methodArn`. APIG will use this ARN to invoke said Lambda handler--in our case this will be the Lambda handler that gets the profile data.
+
+#### Scope
 
 As mentioned when [discussing authorization](#a-note-on-authorization), Auth0 can also provide scope a custom JWT claim. But we didn't configure this and that's why it's not part of the `verifiedData`. If it is configured, you can propagate it downstream like this:
 
@@ -856,6 +884,8 @@ const authResponse = {
   // highlight-end
 };
 ```
+
+### 7. Releasing the Lambda
 
 Finally, add a release command to the `package.json`:
 
