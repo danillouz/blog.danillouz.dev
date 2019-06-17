@@ -4,11 +4,11 @@ date: '2019-06-07T17:03:43.227Z'
 description: 'How to protect AWS API Gateway endpoints with Lambda and Auth0.'
 ---
 
-Something I learned the hard way is that auth is complicated. It can be difficult to reason about and can be hard to work with. The terminology can be complex as well--terms are sometimes used interchangeably or can be ambiguous. Like saying "auth" to refer to both authentication (who are you?) and authorization (I know who you are, but what are you allowed to do?).
+Auth is complicated--it can be difficult to reason about and can be hard to work with. The terminology can be complex as well and terms are sometimes used interchangeably or can be ambiguous. Like saying "auth" to refer to both authentication (who are you?) and authorization (I know who you are, but what are you allowed to do?).
 
 On top of that, it can also be challenging to know when to use what. Depending on what you're building and for whom, different auth protocols and strategies might be more suitable or required.
 
-I won't be covering these protocols and strategies in depth. Instead, I want to show you that implementing something as complex as auth can be quite simple. In order to do that, I'll focus on a specific (but common) use case. And show you how it can be implemented using a specific set of technologies.
+In this post I won't be exploring these protocols and strategies in depth. Instead, I want to show you that implementing something as complex as auth doesn't have to be difficult. In order to do that, I'll focus on a specific (but common) use case and show you a way to implement it--using a specific set of technologies.
 
 ### Table of contents
 
@@ -23,7 +23,7 @@ I won't be covering these protocols and strategies in depth. Instead, I want to 
 - [CORS headers](#cors-headers)
 - [In closing](#in-closing)
 
-But if you just want to read the code, head over to <a href="https://github.com/danillouz/serverless-auth" target="_blank" rel="noopener noreferrer">this GitHub repo</a>.
+If you just want to read the code, go to <a href="https://github.com/danillouz/serverless-auth" target="_blank" rel="noopener noreferrer">github.com/danillouz/serverless-auth</a>.
 
 ## Use case and technologies
 
@@ -48,25 +48,23 @@ In order to build an auth server you could use:
 
 - <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol. This is an "identity layer" built on top of OAuth 2.0.
 
-- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based authentication</a>: a strategy that requires a client to send a signed bearer token when making requests to a protected API. The API will only respond to requests when it receives a verified token.
+- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based authentication</a>: a strategy that requires a client to send a signed bearer token when making requests to a protected API. The API will only respond to requests successfully when it received a verified token.
 
-- <a href="https://tools.ietf.org/html/rfc7519" target="_blank" rel="noopener noreferrer">JSON Web Tokens (JWTs)</a>: a way to securely send auth information as JSON. The JWT contains a "Header", "Payload" and "Signature" which are Base64 encoded and "dot" separated. In effect, the JWT is used as the bearer token. You can see how a JWT looks like by visiting <a href="https://jwt.io/" target="_blank" rel="noopener noreferrer">jwt.io</a>.
+- <a href="https://tools.ietf.org/html/rfc7519" target="_blank" rel="noopener noreferrer">JSON Web Tokens (JWTs)</a>: a way to send auth information ("claims") as JSON. The JWT contains a "Header", "Payload" and "Signature" which are Base64 encoded and "dot" separated. In effect, the JWT is used as the bearer token. You can see how a JWT looks like by visiting <a href="https://jwt.io/" target="_blank" rel="noopener noreferrer">jwt.io</a>.
 
-And with perhaps the help of some other tools/frameworks, you might be confident to make it happen. But I think that (in most cases) you shouldn't go down this route. Why not? Because it will cost you and your team a _lot_ of time, energy and money to build, operate and maintain it.
+And with perhaps the help of some other tools/libraries, you might be confident enough to build it. But I think that (in most cases) you shouldn't go down this route. Why not? Because it will cost you and your team a _lot_ of time, energy and money to build, operate and maintain it.
 
-And even if you do manage to build it, the result can be poor. There _will_ be bugs, and edge cases you didn't think of. But because auth is a nontrivial problem to solve, you might even implement (parts of) the spec incorrectly.
+And even if you do manage to build it, the result can be poor. There will be bugs, and edge cases you didn't think of. But because auth is a nontrivial problem to solve, you might even implement (parts of) the spec incorrectly.
 
-If you do have a valid use case plus enough resources and knowledge to build your own auth server, tread carefully. **A poor implementation will lead to a bad user experience and is also dangerous, because it can compromise your users and organization.**
+If you do have a valid use case, plus enough resources and knowledge to build your own auth server, tread carefully. **A poor implementation will lead to a bad user experience and is also dangerous, because it can compromise your users and organization.**
 
 What should you do then? In my opinion, use a third party auth provider like <a href="https://aws.amazon.com/cognito/" target="_blank" rel="noopener noreferrer">Cognito</a> or <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a>. They give you all the fancy tooling, scalable infrastructure and resources you will need to provide a _secure_, _reliable_, _performant_ and _usable_ solution. Sure, you'll have to pay for it, but the pricing is _very_ fair. And it will most likely be a small fraction of what it would cost you when you'd roll your own solution.
 
-Another (sometimes overlooked) benefit of choosing _buy over build_, is that you'll get access to the domain expert's _knowledge_. Where they can advise and help you choose the best auth strategy for your use case.
-
-And last but not least--leaving the complexities and challenges of auth to the experts, gives you the ability to _focus_ on your own things again!
+Another (sometimes overlooked) benefit of choosing _buy over build_, is that you'll get access to the domain expert's _knowledge_. Where they can advise and help you choose the best auth strategy for your use case. And last but not least--leaving the complexities and challenges of auth to the experts, gives you the ability to _focus_ on your own things again!
 
 However, I do recommend you build an auth service yourself for learning purposes. I think it's quite fun and challenging. And more importantly, you'll get a deeper understanding of the subject--which will be _very_ helpful when you're navigating the "documentation jungle" of your favorite auth provider.
 
-Okay, lets get started.
+Okay, lets get started!
 
 ## What will we build?
 
@@ -82,7 +80,7 @@ Requirements and constraints are:
 - The endpoint will require a bearer token to return the profile data.
   - The token will be sent via the `Authorization` request header.
   - The `Authorization` request header value must have the format: `Bearer TOKEN`.
-  - The token is verified by a Lambda Authorizer.
+  - The token is verified by a Lambda Authorizer with the help of Auth0.
 
 ### Example
 
@@ -108,7 +106,7 @@ Content-Type: application/json
 
 ## Registering the API with Auth0
 
-When the Account API receives a request with the bearer token, it will have to verify the token with Auth0. In order to that, we first have to register our API with them:
+When the Account API receives a request with the bearer token, it will have to verify the token with Auth0. In order to do that, we first have to register our API with them:
 
 1. Create an Auth0 account and setup your tenant.
 2. In the Auth0 dashboard, navigate to "APIs" and click on "Create API".
@@ -127,7 +125,7 @@ Now that our API is registered with Auth0, we need to take note of the following
 
 - Token issuer: this is basically your Auth0 tenant. It always has the format `https://TENANT_NAME.REGION.auth0.com`. For example `https://danillouz.eu.auth0.com/`.
 - JWKS URI: this returns a <a href="https://auth0.com/docs/jwks" target="_blank" rel="noopener noreferrer">JSON Web Key Set (JWKS)</a>. The URI will be used by the Lambda Authorizer to fetch a public key from Auth0 and verify the token (more on that later). It always has the format `https://TENANT_NAME.REGION.auth0.com/.well-known/jwks.json`. For example `https://danillouz.eu.auth0.com/.well-known/jwks.json`.
-- Audience: this is the "Identifier" you provided during registration (step 3). For example `https://api.danillouz.dev/account`.
+- Audience: this is the "Identifier" you provided during registration (step 3). For example `https://api.danillouz.dev/account`. Note that this doesn't have to be a "real" endpoint.
 
 You can also find these values in the "Quick Start" section of the Auth0 API details screen (you were redirected there after registering the API). For example, click on the "Node.js" tab and look for these properties:
 
@@ -225,7 +223,7 @@ This may not be feasible in all use cases, but doing this keeps your Lambda Auth
 - Verifying the token.
 - Propagating authorization information downstream.
 
-The downstream Lambda handler will then decide if it should execute for the specific caller. Which I think makes sense. Because from a practical perspective, the Lambda handler contains "business logic", so it can also make authorization decisions (if it has all information). And from a design perspective, this will lead to a nice "decoupling" between the authentication- and authorization logic--between the Lambda Authorizer and Lambda handlers.
+The downstream Lambda handler will then use the authorization information to decide if it should execute its "business logic" for the specific caller. And following this design also leads to a nice "decoupling" between the authentication- and authorization logic, i.e. between the Lambda Authorizer and Lambda handlers.
 
 You can propagate authorization information by returning a `context` object in the Lambda Authorizer's response:
 
@@ -254,7 +252,7 @@ module.exports.authorizer = event => {
 };
 ```
 
-A caveat regarding the `context` object is that you can _not_ set a JSON object or array as a valid value of any key. It must be either a `String`, `Number` or `Boolean`:
+But there's a caveat here. You can _not_ set a JSON object or array as a valid value of any key in the `context` object. It must be either a `String`, `Number` or `Boolean`:
 
 ```js
 context: {
@@ -266,7 +264,7 @@ context: {
 }
 ```
 
-Any valid properties passed to the `context` object are made available to downstream Lambda handlers via the `event` object:
+Any "valid" properties passed to the `context` object are made available to downstream Lambda handlers via the `event` object:
 
 ```js
 'use strict';
@@ -283,17 +281,17 @@ I won't show how to configure scope with Auth0, but the <a href="https://auth0.c
 
 ## Solidifying our mental model
 
-With that covered, we're now ready to build the Lambda Authorizer and the Account API. But before we do, let's take a step back and solidify our mental model first.
+With that covered, we're ready to build the Lambda Authorizer and the Account API. But before we do, let's take a step back and solidify our mental model first.
 
 To summarize, we need the following components to protect our API:
 
 - Auth0 as the third party auth provider to issue- and help verify bearer tokens.
-- AWS APIG to represent the Account API.
+- AWS APIG to represent the API.
 - A Lambda Authorizer to verify tokens with Auth0.
 - A Lambda handler for the `GET /profile` endpoint to return the profile data.
 - `curl` as the client to send HTTP requests to the API with a token.
 
-We can visualize how these components will interact with each other, like this:
+We can visualize how these components will interact with each other like this:
 
 <figure>
   <img src="./img/auth-flow.png" alt="Image that shows an auth flow diagram.">
@@ -351,7 +349,7 @@ Now install the following required npm dependencies:
 npm i jsonwebtoken jwks-rsa
 ```
 
-The <a href="https://github.com/auth0/node-jsonwebtoken" target="_blank" rel="noopener noreferrer">jsonwebtoken</a> library will help use decode the bearer token (JWT) and verify its signature, [issuer and audience](#registering-the-api-with-auth0) claims. The <a href="https://github.com/auth0/node-jwks-rsa" target="_blank" rel="noopener noreferrer">jwks-rsa</a> library will help us fetch the JWKS from Auth0.
+The <a href="https://github.com/auth0/node-jsonwebtoken" target="_blank" rel="noopener noreferrer">jsonwebtoken</a> library will help use decode the bearer token (JWT) and verify its signature, issuer and audience claims. The <a href="https://github.com/auth0/node-jwks-rsa" target="_blank" rel="noopener noreferrer">jwks-rsa</a> library will help us fetch the JWKS from Auth0.
 
 We'll use the Serverless Framework to configure and upload the Lambda to AWS, so install it as a "dev" dependency:
 
@@ -523,7 +521,7 @@ module.exports = function getToken(event) {
 };
 ```
 
-Here we're only interested in `TOKEN` events because we're implementing a [token-based authorizer](#whats-a-lambda-authorizer). And we can access the `Authorization` request header value via the `event.authorizationToken` property.
+Here we're only interested in `TOKEN` events because we're implementing a [token-based authorizer](#whats-a-lambda-authorizer). And we can access the value of the `Authorization` request header via the `event.authorizationToken` property.
 
 Then `require` and call the helper in the Lambda with the APIG HTTP input <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format" target="_blank" rel="noopener noreferrer">event</a> as an argument:
 
@@ -646,7 +644,7 @@ module.exports.verifyBearer = async event => {
 };
 ```
 
-To fetch the public key from Auth0 (step 2) we'll use the `jwks-rsa` library. It exposes a client with `getSigningKey` method to fetch the key. Pas this method as the third argument when calling the helper:
+To fetch the public key from Auth0 (step 2) we'll use the `jwks-rsa` library. It exposes a client with `getSigningKey` method to fetch the key. Pas a "promisified" version of this method as the third argument when calling the helper:
 
 ```js
 'use strict';
@@ -686,7 +684,7 @@ module.exports.verifyBearer = async event => {
 };
 ```
 
-Finally, to verify the token signature, issuer and audience claims (step 3) we'll use the `jsonwebtoken` library again. It exposes a `verify` method. Pass this method together with the `TOKEN_ISSUER` and `AUDIENCE` as the final arguments when calling the helper:
+Finally, to verify the token signature, issuer and audience claims (step 3) we'll use the `jsonwebtoken` library again. It exposes a `verify` method. Pass a "promisified" version of this method together with the `TOKEN_ISSUER` and `AUDIENCE` as the final arguments when calling the helper:
 
 ```js
 'use strict';
@@ -733,7 +731,7 @@ module.exports.verifyBearer = async event => {
 };
 ```
 
-When the helper verifies the token, it will return the JWT Payload data as `verifiedData`:
+When the helper verifies the token, it will return the JWT Payload data as `verifiedData`. For example:
 
 ```json
 {
@@ -819,20 +817,22 @@ The `authResponse.principalId` property must represent a unique (user) identifie
   "iat": 1560521845,
   "exp": 1560608245,
   "azp": "gXGPjvFoQvxjsnh28azhHmcbR7IQH20J",
-  "gty": "client-credentials"
+  "gty": "client-credentials" // highlight-line
 }
 ```
 
-Note that it's postfixed with `@clients`. This is because Auth0 automatically created a "Test Application" for us when we registered the Account API with them. And it's via this test application that we obtain the test token (using the client credentials grant to be specific).
+Note that if you use the Auth0 test token, the `sub` claim will be postfixed with `@clients`. This is because Auth0 automatically created a "Test Application" for us when we registered the Account API with them. And it's via this test application that we obtain the test token--using the <a href="https://auth0.com/docs/flows/concepts/client-credentials">client credentials grant</a> to be specific, as denoted by the `gty` (grant type) claim.
 
-In this case the test application represents a "machine" and not a user. But that's fine because the machine has a unique identifier the same way a user would have (by means of a client ID). You can find the test application in the Auth0 dashboard by navigating to "Applications" and selecting "Account API (Test Application)":
+In this case the test application represents a "machine" and _not_ a user. But that's fine because the machine has a unique identifier the same way a user would have (by means of a client ID). This means this implementation will also work when using "user centric" auth flows like the <a href="https://auth0.com/docs/flows/concepts/implicit">implicit grant</a>.
+
+You can find the test application in the Auth0 dashboard by navigating to "Applications" and selecting "Account API (Test Application)":
 
 <figure>
   <img src="./img/auth0/test-application.png" alt="Image that shows the Auth0 Test Application.">
   <figcaption>The client ID is <code class="language-text">gXGPjvFoQvxjsnh28azhHmcbR7IQH20J</code> which matches the JWT <code class="language-text">sub</code> claim.</figcaption>
 </figure>
 
-The ARN of the Lambda handler associated with the originally called endpoint, can be obtained from `event.methodArn`. APIG will use this ARN to invoke said Lambda handler--in our case this will be the Lambda handler that gets the profile data.
+The ARN of the Lambda handler associated with the called endpoint can be obtained from `event.methodArn`. APIG will use this ARN to invoke said Lambda handler--in our case this will be the Lambda handler that gets the profile data.
 
 As mentioned when [discussing authorization](#a-note-on-authorization), Auth0 can also provide scope a custom JWT claim. But we didn't configure this and that's why it's not part of the `verifiedData`. If it is configured, you can propagate it downstream like this:
 
@@ -880,7 +880,7 @@ Finally, add a release command to the `package.json`:
 }
 ```
 
-In order to upload the Lambda to AWS, make sure you have your <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html" target="_blank" rel="noopener noreferrer">AWS credentials</a> configured. Then release the Lambda with:
+In order to upload the Lambda to AWS, make sure you have your <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html" target="_blank" rel="noopener noreferrer">AWS credentials configured</a>. Then release the Lambda with:
 
 ```shell
 npm run release
@@ -926,7 +926,7 @@ Now go to the AWS Console and visit the "Lambda" service. There find `lambda-aut
   <figcaption>Finding the ARN of the Lambda Authorizer</figcaption>
 </figure>
 
-We'll need this to configure the Account API in the next and final part.
+We'll need this to configure the Account API in the next part.
 
 ## Implementing the Account API
 
@@ -1330,4 +1330,4 @@ This will allow your users to signup/login to (for example) your web app, and ge
 
 I've implemented this in several Single Page Applications built with <a href="https://reactjs.org/" target="_blank" rel="noopener noreferrer">React</a> and was very happy with the result. Let me know if you'd be interested to learn more about that and I might write a follow-up that focuses on the frontend implementation.
 
-You can find all code in <a href="https://github.com/danillouz/serverless-auth" target="_blank" rel="noopener noreferrer">this GitHub repo</a>.
+You can find all code at <a href="https://github.com/danillouz/serverless-auth" target="_blank" rel="noopener noreferrer">github.com/danillouz/serverless-auth</a>.
