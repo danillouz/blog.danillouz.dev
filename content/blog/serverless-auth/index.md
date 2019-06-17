@@ -750,11 +750,11 @@ When the helper verifies the token, it will return the JWT Payload data as `veri
 ```json
 {
   "iss": "https://danillouz.eu.auth0.com/",
-  "sub": "gXGPjvFoQvxjsnh28azhHmcbR7IQH20J@clients",
+  "sub": "FHgLVARPk8oXjsP5utP8wYAnZePPAkw1@clients",
   "aud": "https://api.danillouz.dev/account",
-  "iat": 1560521845,
-  "exp": 1560608245,
-  "azp": "gXGPjvFoQvxjsnh28azhHmcbR7IQH20J",
+  "iat": 1560762850,
+  "exp": 1560849250,
+  "azp": "FHgLVARPk8oXjsP5utP8wYAnZePPAkw1",
   "gty": "client-credentials"
 }
 ```
@@ -823,23 +823,35 @@ module.exports.verifyBearer = async event => {
 };
 ```
 
-#### Principal ID
+#### Principal identifier
 
 The `authResponse.principalId` property must represent a unique (user) identifier associated with the token sent by the client. Auth0 provides this via the JWT `sub` claim and ours has the value:
 
 ```json
 {
   "iss": "https://danillouz.eu.auth0.com/",
-  "sub": "gXGPjvFoQvxjsnh28azhHmcbR7IQH20J@clients", // highlight-line
+  "sub": "FHgLVARPk8oXjsP5utP8wYAnZePPAkw1@clients", // highlight-line
   "aud": "https://api.danillouz.dev/account",
-  "iat": 1560521845,
-  "exp": 1560608245,
-  "azp": "gXGPjvFoQvxjsnh28azhHmcbR7IQH20J",
-  "gty": "client-credentials" // highlight-line
+  "iat": 1560762850,
+  "exp": 1560849250,
+  "azp": "FHgLVARPk8oXjsP5utP8wYAnZePPAkw1",
+  "gty": "client-credentials"
 }
 ```
 
-Note that if you use an Auth0 test token, the `sub` claim will be postfixed with `@clients`. This is because Auth0 automatically created a "Test Application" for us when we registered the Account API with them. And it's via this test application that we obtain a test token--using the <a href="https://auth0.com/docs/flows/concepts/client-credentials">client credentials grant</a> to be specific, as denoted by the `gty` (grant type) claim.
+Note that if you use an Auth0 test token, the `sub` claim will be postfixed with `@clients`. This is because Auth0 automatically created a "Test Application" for us when we registered the Account API with them. And it's via this test application that we obtain a test token--using the <a href="https://auth0.com/docs/flows/concepts/client-credentials">client credentials grant</a> to be specific, as denoted by the `gty` (grant type) claim:
+
+```json
+{
+  "iss": "https://danillouz.eu.auth0.com/",
+  "sub": "FHgLVARPk8oXjsP5utP8wYAnZePPAkw1@clients",
+  "aud": "https://api.danillouz.dev/account",
+  "iat": 1560762850,
+  "exp": 1560849250,
+  "azp": "FHgLVARPk8oXjsP5utP8wYAnZePPAkw1",
+  "gty": "client-credentials" // highlight-line
+}
+```
 
 In this case the test application represents a "machine" and _not_ a user. But that's okay because the machine has a unique identifier the same way a user would have (by means of a client ID). This means this implementation will also work when using "user centric" auth flows like the <a href="https://auth0.com/docs/flows/concepts/implicit">implicit grant</a>.
 
@@ -847,16 +859,49 @@ You can find the test application in the Auth0 dashboard by navigating to "Appli
 
 <figure>
   <img src="./img/auth0/test-application.png" alt="Image that shows the Auth0 Test Application.">
-  <figcaption>The client ID is <code class="language-text">gXGPjvFoQvxjsnh28azhHmcbR7IQH20J</code> which matches the JWT <code class="language-text">sub</code> claim.</figcaption>
+  <figcaption>The client ID is <code class="language-text">FHgLVARPk8oXjsP5utP8wYAnZePPAkw1</code> which matches the JWT <code class="language-text">sub</code> claim.</figcaption>
 </figure>
 
 #### Method ARN
 
 The ARN of the Lambda handler associated with the called endpoint can be obtained from `event.methodArn`. APIG will use this ARN to invoke said Lambda handler--in our case this will be the Lambda handler that gets the profile data.
 
-#### Scope
+#### Granting a client scopes
 
-As mentioned when [discussing authorization](#a-note-on-authorization), Auth0 can also provide scope a custom JWT claim. But we didn't configure this and that's why it's not part of the `verifiedData`. If it is configured, you can propagate it downstream like this:
+Like mentioned when discussing [scopes](#scopes), Auth0 can provide scopes as authorization information. In order for Auth0 to do this, we first need to "grant" our client the `get:profile` scope from the Auth0 dashboard.
+
+In our case, the client is the "Test Application" Auth0 created for us. But the process is the same for other clients as well (like the "Single Page Web Application" client).
+
+Navigate to the "APIs" tab in the "Test Application" details and click on the "right pointing chevron" (circled in red) next to "Account API":
+
+<figure>
+  <img src="./img/auth0/grant-scope-1.png" alt="Image that shows the Auth0 test application authorization settings.">
+  <figcaption>Select the Account API.</figcaption>
+</figure>
+
+Then check the `get:profile` scope, click "Update" and "Continue":
+
+<figure>
+  <img src="./img/auth0/grant-scope-2.png" alt="Image that shows how to grant the Auth0 test application the get profile scope.">
+  <figcaption>Select <code class="language-text">get:profile</code> scope.</figcaption>
+</figure>
+
+Now the configured scope will be a claim on issued test tokens (JWT):
+
+```json
+{
+  "iss": "https://danillouz.eu.auth0.com/",
+  "sub": "FHgLVARPk8oXjsP5utP8wYAnZePPAkw1@clients",
+  "aud": "https://api.danillouz.dev/account",
+  "iat": 1560762850,
+  "exp": 1560849250,
+  "azp": "FHgLVARPk8oXjsP5utP8wYAnZePPAkw1",
+  "scope": "get:profile", // highlight-line
+  "gty": "client-credentials"
+}
+```
+
+And therfore part of the `verifiedData`, so we can propagate it to downstream Lambda handlers like this:
 
 ```js
 const authResponse = {
