@@ -8,7 +8,22 @@ Something I learned the hard way is that auth is complicated. It can be difficul
 
 On top of that, it can also be challenging to know when to use what. Depending on what you're building and for whom, different auth protocols and strategies might be more suitable or required.
 
-I won't be covering these protocols and strategies in depth. Instead, I want to show you that implementing something as complex as auth can be quite simple. In order to do that, I'll focus on a specific (but common) use case. And show you how it can be implemented using a specific set of technologies. But if you just want to read the code, head over to <a href="https://github.com/danillouz/serverless-auth" target="_blank" rel="noopener noreferrer">this GitHub repo</a>.
+I won't be covering these protocols and strategies in depth. Instead, I want to show you that implementing something as complex as auth can be quite simple. In order to do that, I'll focus on a specific (but common) use case. And show you how it can be implemented using a specific set of technologies.
+
+### Table of contents
+
+- [Use case and technologies](#use-case-and-technologies)
+- [Why use a third party auth provider?](#why-use-a-third-party-auth-provider)
+- [What will we build?](#what-will-we-build)
+- [Registering the API with Auth0](#registering-the-api-with-auth0)
+- [What’s a Lambda Authorizer?](#whats-a-lambda-authorizer)
+- [Solidifying our mental model](#solidifying-our-mental-model)
+- [Implementing the Lambda Authorizer](#implementing-the-lambda-authorizer)
+- [Implementing the Account API](#implementing-the-account-api)
+- [CORS headers](#cors-headers)
+- [In closing](#in-closing)
+
+But if you just want to read the code, head over to <a href="https://github.com/danillouz/serverless-auth" target="_blank" rel="noopener noreferrer">this GitHub repo</a>.
 
 ## Use case and technologies
 
