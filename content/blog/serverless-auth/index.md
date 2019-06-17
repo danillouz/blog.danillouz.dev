@@ -27,7 +27,7 @@ If you just want to read the code, go to <a href="https://github.com/danillouz/s
 
 ## Use case and technologies
 
-> How can we secure an HTTP API with a token based authentication strategy. So only authenticated- and authorized users can access it via a (web) client?
+> How can we secure an HTTP API with a token based authentication strategy, so only authenticated- and authorized clients can access it?
 
 More specifically:
 
@@ -36,7 +36,7 @@ More specifically:
 - The Lambda handlers are implemented using <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> and the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>.
 - <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a> is used as a third party auth provider.
 - An <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">APIG Lambda Authorizer</a> is used to verify the token with Auth0.
-- <a href="https://en.wikipedia.org/wiki/CURL" target="_blank" rel="noopener noreferrer">cURL</a> (`curl`) is used as the client to send HTTP requests to the API with a token.
+- <a href="https://en.wikipedia.org/wiki/CURL" target="_blank" rel="noopener noreferrer">cURL</a> (`curl`) is used as a client to send HTTP requests to the API with a token.
 
 ## Why use a third party auth provider?
 
@@ -1006,7 +1006,9 @@ We'll do this by:
 3. [Defining the Lambda handler](#3-defining-the-lambda-handler)
 4. [Releasing the API](#4-releasing-the-api)
 5. [Configuring the Lambda Authorizer](#5-configuring-the-lambda-authorizer)
-6. [Getting a test token](#6-getting-a-test-token)
+6. [Adding authorization logic](#6-adding-authorization-logic)
+7. [Releasing the API with auth](#7-releasing-the-api-with-auth)
+8. [Getting a test token](#8-getting-a-test-token)
 
 ### 1. Setting up the API project
 
@@ -1122,20 +1124,56 @@ And in `src/handler.js` export a function named `getProfile`:
 'use strict';
 
 module.exports.getProfile = async () => {
-  const profileData = {
-    name: 'Daniël'
-  };
+  try {
+    // Lambda handler implementation goes here
+  } catch (err) {
+    const statusCode = err.code || 500;
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify(profileData)
-  };
+    return {
+      statusCode,
+      body: JSON.stringify({
+        message: err.message,
+        info: err.info
+      })
+    };
+  }
 };
 ```
 
-The Lambda handler returns an <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-output-format" target="_blank" rel="noopener noreferrer">HTTP output</a> object with the profile data as JSON.
+If something goes "wrong" in the Lambda, we return an error response as <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-output-format" target="_blank" rel="noopener noreferrer">HTTP output</a> back to the caller.
 
-And this is actually all we need. Before we protect the endpoint, lets release it to see if we can call it.
+Otherwise we return the profile data:
+
+```js
+'use strict';
+
+module.exports.getProfile = async () => {
+  try {
+    // highlight-start
+    const profileData = {
+      name: 'Daniël'
+    };
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify(profileData)
+    };
+    // highlight-end
+  } catch (err) {
+    const statusCode = err.code || 500;
+
+    return {
+      statusCode,
+      body: JSON.stringify({
+        message: err.message,
+        info: err.info
+      })
+    };
+  }
+};
+```
+
+Before we protect the endpoint and add authorization logic, lets first release it to see if we can call it.
 
 ### 4. Releasing the API
 
@@ -1260,7 +1298,7 @@ Lets go over the `authorizer` properties:
 - `identitySource`: where APIG should "look" for the bearer token.
 - `identityValidationExpression`: the expression used to extract the bearer token from the `identitySource`.
 
-Now we only have to configure our endpoint to use the Lambda Authorizer:
+We'll use these properties to configure our endpoint with the Lambda Authorizer:
 
 ```yaml
 service: account-api
@@ -1301,13 +1339,66 @@ functions:
           authorizer: ${self:custom.authorizer} # highlight-line
 ```
 
-And do another release:
+### 6. Adding authorization logic
+
+Now the Lambda Authorizer is configured and we also propagate the `get:profile` scope from the Lambda Authorizer, we can check if a caller has been granted the required scope. If not, we return a `403 Forbidden` response back to the caller:
+
+```js
+'use strict';
+
+const REQUIRED_SCOPE = 'get:profile'; // highlight-line
+
+module.exports.getProfile = async event => {
+  try {
+    // highlight-start
+    const { authorizer = {} } = event.requestContext;
+    const { scope = '' } = authorizer;
+    const hasScope = scope.split(' ').includes(REQUIRED_SCOPE);
+    if (!hasScope) {
+      const err = new Error('Forbidden');
+      err.code = 403;
+      err.info = 'scope "get:profile" is required';
+
+      throw err;
+    }
+    // highlight-end
+
+    const profileData = {
+      name: 'Daniël'
+    };
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify(profileData)
+    };
+  } catch (err) {
+    const statusCode = err.code || 500;
+    return {
+      statusCode,
+      body: JSON.stringify({
+        message: err.message,
+        info: err.info
+      })
+    };
+  }
+};
+```
+
+Note that the `authorizer.scope` is a string value and that it may contain more than one scope value. When multiple scopes are configured, they will be space separated like this:
+
+```js
+'get:profile update:profile';
+```
+
+### 7. Releasing the API with auth
+
+Do another release:
 
 ```shell
 npm run release
 ```
 
-After Serverless finishes, go to the AWS Console and visit the "API Gateway" service. There navigate to "prod-account-api" and then click on the "GET" resource under "/profile". You should now see that the "Method Request" tile has a property "Auth" set to `auth0VerifyBearer`:
+After Serverless finishes, go to the AWS Console and visit the "API Gateway" service. There navigate to "prod-account-api" and click on the "GET" resource under "/profile". You should now see that the "Method Request" tile has a property "Auth" set to `auth0VerifyBearer`:
 
 <figure>
   <img src="./img/aws/apig-lambdas.png" alt="Image that shows the API Gateway resource configuration.">
@@ -1326,7 +1417,7 @@ It should return:
 { "message": "Unauthorized" }
 ```
 
-### 6. Getting a test token
+### 8. Getting a test token
 
 We can get a test token from the Auth0 dashboard, by navigating to the "Test" tab in the API details screen:
 
@@ -1357,7 +1448,16 @@ This should return the profile data again:
 { "name": "Daniël" }
 ```
 
-Awesome! We successfully secured our API with a token based auth strategy!
+Additionally, sending a token without the required scope will return:
+
+```json
+{
+  "message": "Error: Forbidden",
+  "info": "scope \"get:profile\" is required"
+}
+```
+
+Awesome! We successfully secured our API with a token based authentication strategy, so only authenticated- and authorized clients can access it!
 
 ## CORS headers
 
