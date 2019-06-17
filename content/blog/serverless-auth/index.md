@@ -33,10 +33,10 @@ More specifically:
 
 - The HTTP API is an <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html" target="_blank" rel="noopener noreferrer">AWS API Gateway</a> (APIG).
 - The API endpoints are protected with a <a href="https://oauth.net/2/bearer-tokens/" target="_blank" rel="noopener noreferrer">bearer token</a> and implemented as <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html" target="_blank" rel="noopener noreferrer">Lambda Proxy Integrations</a> (i.e. Lambda handlers).
-- The Lambda handlers are implemented using <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> and the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>.
 - <a href="https://auth0.com/" target="_blank" rel="noopener noreferrer">Auth0</a> is used as a third party auth provider.
 - An <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html" target="_blank" rel="noopener noreferrer">APIG Lambda Authorizer</a> is used to verify the token with Auth0.
-- <a href="https://en.wikipedia.org/wiki/CURL" target="_blank" rel="noopener noreferrer">cURL</a> (`curl`) is used as a client to send HTTP requests to the API with a token.
+- The Lambdas are implemented using <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> and the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>.
+- <a href="https://en.wikipedia.org/wiki/CURL" target="_blank" rel="noopener noreferrer">cURL</a> (`curl`) is used as a "client" to send HTTP requests to the API with a token.
 
 ## Why use a third party auth provider?
 
@@ -48,11 +48,11 @@ In order to build an auth server you could use:
 
 - <a href="https://openid.net/connect/" target="_blank" rel="noopener noreferrer">OpenID Connect (OIDC)</a>: an authentication protocol. This is an "identity layer" built on top of OAuth 2.0.
 
-- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based authentication</a>: a strategy that requires a client to send a signed bearer token when making requests to a protected API. The API will only respond to requests successfully when it received a verified token.
+- <a href="https://auth0.com/learn/token-based-authentication-made-easy/" target="_blank" rel="noopener noreferrer">Token based authentication</a>: a strategy that requires a client to send a signed bearer token when making requests to a protected API. The API will only respond to requests successfully when it receives a verified token.
 
-- <a href="https://tools.ietf.org/html/rfc7519" target="_blank" rel="noopener noreferrer">JSON Web Tokens (JWTs)</a>: a way to send auth information ("claims") as JSON. The JWT contains a "Header", "Payload" and "Signature" which are Base64 encoded and "dot" separated. In effect, the JWT is used as the bearer token. You can see how a JWT looks like by visiting <a href="https://jwt.io/" target="_blank" rel="noopener noreferrer">jwt.io</a>.
+- <a href="https://tools.ietf.org/html/rfc7519" target="_blank" rel="noopener noreferrer">JSON Web Tokens (JWTs)</a>: a way to send auth information (i.e. "claims") as JSON. A JWT contains a "Header", "Payload" and "Signature" which are Base64 encoded and "dot" separated. In effect, a JWT is used as a bearer token. You can see how a JWT looks like by visiting <a href="https://jwt.io/" target="_blank" rel="noopener noreferrer">jwt.io</a>.
 
-And with perhaps the help of some other tools/libraries, you might be confident enough to build it. But I think that (in most cases) you shouldn't go down this route. Why not? Because it will cost you and your team a _lot_ of time, energy and money to build, operate and maintain it.
+And with perhaps the help of some other tools/libraries, you might be confident enough to build an auth server yourself. But I think that (in most cases) you shouldn't go down this route. Why not? Because it will cost you and your team a _lot_ of time, energy and money to build, operate and maintain it.
 
 And even if you do manage to build it, the result can be poor. There will be bugs, and edge cases you didn't think of. But because auth is a nontrivial problem to solve, you might even implement (parts of) the spec incorrectly.
 
@@ -116,7 +116,7 @@ When the Account API receives a request with the bearer token, it will have to v
 
 <figure>
   <img src="./img/auth0/register.png" alt="Image of the Auth0 API registration form.">
-  <figcaption>Register you API with Auth0 by providing a name and identifier.</figcaption>
+  <figcaption>Register you API with Auth0 by providing a name, identifier and signing algorithm.</figcaption>
 </figure>
 
 ### Lambda Authorizer configuration
@@ -193,7 +193,7 @@ Alternatively, the Lambda authorizer may _deny_ invoking the downstream handler 
 }
 ```
 
-This will make APIG respond with `403 Forbidden`. Or you may return an `Unauthorized` error from the Lambda Authorizer to have APIG respond with `401 Unauthorized`.
+This will make APIG respond with `403 Forbidden`. Or it may return an `Unauthorized` error to have APIG respond with `401 Unauthorized`.
 
 ### A note on authorization
 
@@ -230,7 +230,7 @@ You can propagate authorization information (like scopes) by returning a `contex
 
 module.exports.authorizer = event => {
   const authResponse = {
-    principalId: 'UNIQUE_USER_ID',
+    principalId: 'UNIQUE_ID',
     policyDocument: {
       Version: '2012-10-17',
       Statement: [
@@ -458,7 +458,7 @@ functions:
 # highlight-end
 ```
 
-That's it for the Serverless manifest. You can find more information about it in the <a href="https://serverless.com/framework/docs/providers/aws/guide/serverless.yml/" target="_blank" rel="noopener noreferrer">docs</a>.
+That's it for the Serverless manifest. You can find more information about it in the Serverless <a href="https://serverless.com/framework/docs/providers/aws/guide/serverless.yml/" target="_blank" rel="noopener noreferrer">docs</a>.
 
 ### 3. Defining the Lambda Authorizer
 
@@ -839,7 +839,7 @@ The `authResponse.principalId` property must represent a unique (user) identifie
 }
 ```
 
-Note that if you use an Auth0 test token, the `sub` claim will be postfixed with `@clients`. This is because Auth0 automatically created a "Test Application" for us when we registered the Account API with them. And it's via this test application that we obtain a test token--using the <a href="https://auth0.com/docs/flows/concepts/client-credentials">client credentials grant</a> to be specific, as denoted by the `gty` (grant type) claim:
+Note that if you use an Auth0 test token, the `sub` claim will be postfixed with `@clients`. This is because Auth0 automatically created a "Test Application" for us when we registered the Account API with them. And it's via this test application that we obtain a test token--using the <a href="https://auth0.com/docs/flows/concepts/client-credentials">client credentials grant</a> to be specific. This is also specified by the `gty` (grant type) claim:
 
 ```json
 {
@@ -870,7 +870,7 @@ The ARN of the Lambda handler associated with the called endpoint can be obtaine
 
 Like mentioned when discussing [scopes](#scopes), Auth0 can provide scopes as authorization information. In order for Auth0 to do this, we first need to "grant" our client the `get:profile` scope from the Auth0 dashboard.
 
-In our case, the client is the "Test Application" Auth0 created for us. But the process is the same for other clients as well (like the "Single Page Web Application" client).
+In our case, the client is the "Test Application" Auth0 created for us. But the setup process is the same for other client types as well (like the "Single Page Web Application" client).
 
 Navigate to the "APIs" tab in the "Test Application" details and click on the "right pointing chevron" (circled in red) next to "Account API":
 
@@ -1106,7 +1106,7 @@ functions:
 
 ### 3. Defining the Lambda handler
 
-In order to match the Lambda function definition in the Serverless manigest, create a file named `handler.js` in `src`:
+In order to match the Lambda function definition in the Serverless manifest, create a file named `handler.js` in `src`:
 
 ```shell
 account-api
@@ -1294,7 +1294,7 @@ functions:
 Lets go over the `authorizer` properties:
 
 - `arn`: must be the value of the Lambda Authorizer ARN we released and found in the AWS Lambda console.
-- `resultTtlInSeconds`: used to cache the IAM policy document returned from the Lambda Authorizer. When enabled (caching is disabled when set to `0`) and a policy document has been cached, the Lambda Authorizer wont be executed. According to the <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/configure-api-gateway-lambda-authorization-with-console.html" target="_blank" rel="noopener noreferrer">AWS docs</a> the default value is `300` seconds and the max value is `3600` seconds.
+- `resultTtlInSeconds`: used to cache the IAM policy document returned from the Lambda Authorizer. When enabled (caching is disabled when set to `0`) and a policy document has been cached, the Lambda Authorizer wont be executed. According to the AWS <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/configure-api-gateway-lambda-authorization-with-console.html" target="_blank" rel="noopener noreferrer">docs</a> the default value is `300` seconds and the max value is `3600` seconds.
 - `identitySource`: where APIG should "look" for the bearer token.
 - `identityValidationExpression`: the expression used to extract the bearer token from the `identitySource`.
 
@@ -1348,7 +1348,9 @@ Now the Lambda Authorizer is configured and we also propagate the `get:profile` 
 
 const REQUIRED_SCOPE = 'get:profile'; // highlight-line
 
+// highlight-start
 module.exports.getProfile = async event => {
+  // highlight-end
   try {
     // highlight-start
     const { authorizer = {} } = event.requestContext;
@@ -1398,7 +1400,7 @@ Do another release:
 npm run release
 ```
 
-After Serverless finishes, go to the AWS Console and visit the "API Gateway" service. There navigate to "prod-account-api" and click on the "GET" resource under "/profile". You should now see that the "Method Request" tile has a property "Auth" set to `auth0VerifyBearer`:
+After Serverless finishes, go to the AWS Console and visit the "API Gateway" service. There, navigate to "prod-account-api" and click on the "GET" resource under "/profile". You should now see that the "Method Request" tile has a property "Auth" set to `auth0VerifyBearer`:
 
 <figure>
   <img src="./img/aws/apig-lambdas.png" alt="Image that shows the API Gateway resource configuration.">
