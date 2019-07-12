@@ -8,11 +8,6 @@ Intro.
 
 <a href="" target="_blank" rel="noopener noreferrer">link</a>
 
-<figure>
-  <img src="./img" alt="Image of something.">
-  <figcaption>Some figure description.</figcaption>
-</figure>
-
 ### Table of contents
 
 - [Topic](#)
@@ -32,9 +27,24 @@ Normalization vs denormalization
 
 ## Terminology
 
-Table, Items, Attributes
+In DynamoDB data is organized in a **table**, which contains many **items** and each item consists of **attributes**.
 
-Primary key; hash key, sort key
+<figure>
+  <img src="./img/table.png" alt="Visualizing a DynamoDB table.">
+  <figcaption>DynamoDB items are analogous to rows in a relational table. And attributes to columns.</figcaption>
+</figure>
+
+At the time of this writing you can have a maximum of `256` tables per region. Where a table can have unlimited items, but a single item may not exceed `400 KB` in size. And attributes can only be nested to a maximum of `32` levels deep.
+
+An item is _schemaless_, with the exception of the **primary key**, which uniquely identifies an item in the table. Here the primary key can be:
+
+- "simple": meaning its just a single attribute, like `item_id`. This single attribute is reffered to as the **partition key** (or partition attribute).
+- "composite": meaning it consists of two attributes, like `item_id` and `creation_date`. Here the second attribute is referred to as a **sort key** (or sort attribute).
+
+The paritition key is sometimes referred to as the **hash key** (or hash attribute). Because the value of the partition key is provided as the input to an internal hash function. The output hash of this function then determines the physical storage partition of the item.
+Additionally, the sort key is sometimes referred to as the **range key** (or range attribute). Because items with the same hash key are stored physically close together, and then sorted per partition.
+
+Something that might not be totally obvious when starting out with DynamoDB, is that you can _only_ get and query items by partition key! And if you need to retrieve one or more items by another attribute, you need to create a secondary index.
 
 ## Secondary Indexes
 
