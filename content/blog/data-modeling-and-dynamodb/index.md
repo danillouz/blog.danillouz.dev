@@ -18,4 +18,48 @@ Intro.
 - [Topic](#)
 - [In closing](#in-closing)
 
+## History
+
+Based on Dynamo paper..
+
+## Types of DBs
+
+Relational, Key-Value, Document, Graph, Ledger, Time Series, Search
+
+## SQL vs NoSQL
+
+Normalization vs denormalization
+
+## Terminology
+
+Table, Items, Attributes
+
+Primary key; hash key, sort key
+
+## Secondary Indexes
+
+GSI, LSI
+
+## CRUD
+
+Put, Query, Scan, Update, Delete
+
+## How to model data
+
+Workflow
+
+1:1
+1:N
+N:M
+Hierarchical
+Graph
+
+## Internals
+
+## Provisioning and Capacity
+
+## Streams
+
+## Example
+
 ## In closing
