@@ -6,7 +6,7 @@ description: 'Exploring a scalable and cost-effective serverless audio transcodi
 
 ## TL;DR
 
-For my side project I'm transcoding WebM audio files into MP3. I initially started doing this with <a href="https://aws.amazon.com/elastictranscoder/" target="_blank" rel="noopener noreferrer">Amazon Elastic Transcoder</a>, which works pretty well. But after transcoding the same audio files with <a href="https://www.ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a> + <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html" target="_blank" rel="noopener noreferrer">AWS Lambda Layers</a>, my initial testing shows that this implementation is around **3653 times cheaper** when compared to Amazon Elastic Transcoder--at least for _short audio files_ (maximum duration of 3 minutes).
+For my side project I'm transcoding WebM audio files into MP3. I initially started doing this with <a href="https://aws.amazon.com/elastictranscoder/" target="_blank" rel="noopener noreferrer">Amazon Elastic Transcoder</a>, which works pretty well. But after transcoding the same audio files with <a href="https://www.ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a> + <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html" target="_blank" rel="noopener noreferrer">AWS Lambda Layers</a>, my initial testing shows that this implementation is around **3653 times cheaper** than Amazon Elastic Transcoder--at least for _short audio files_ that have a maximum duration of 3 minutes.
 
 If you want to see the code for the audio transcoder, go to <a href="https://github.com/upstandfm/audio-transcoder" target="_blank" rel="noopener noreferrer">github.com/upstandfm/audio-transcoder</a>.
 
@@ -18,62 +18,59 @@ If you want to see the code for the audio transcoder, go to <a href="https://git
 
 ## Use case
 
-I recently started working on a new side project called Upstand FM. It's a web app that allows you to record your voice, so other users of the app can listen to it.
+I recently started working on a new side project called <a href="https://www.upstand.fm/" target="_blank" rel="noopener noreferrer">Upstand FM</a>. It's a web app that allows you to record your voice, so other users of the app can listen to what you have to say.
 
-In the app I used the <a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaStream_Recording_API" target="_blank" rel="noopener noreferrer">MediaStream Recording API</a> to easily record audio from the user's input device. It works really well, and you don't have to use any external libraries!<br/>
+In the app I used the <a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaStream_Recording_API" target="_blank" rel="noopener noreferrer">MediaStream Recording API</a> (aka Media Recording API) to easily record audio from the user's input device. It works really well, and you don't have to use any external libraries!<br/>
 What's the catch then? Well, it only works in Firefox, Chrome and Opera. Hopefully it will soon also work in Safari--at the time of this writing you have to enable it via an experimental feature flag called "MediaRecorder", but not all events are supported. This means that the implementation you got working in Firefox or Chrome, probably won't work in Safari.<br/>
 Even though that's a bit disappointing, I was okay with it for my use case.
 
 ## What does transcoding even mean?
 
-Before I can answer that, we need to ask a different question:
+Before I can answer that, we need to explore _what_ an audio file is.
 
-> What's an audio file?
-
-We can think of an audio file like a stream of data elements wrapped in a container. This container is formally called a <a href="https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Containers" target="_blank" rel="noopener noreferrer">media container format</a>, and it's basically a _file format_ (file type) that can store different types of data elements (bits).<br/>
-The container describes how this data "coexists" in a file. Some container formats only support audio, like <a href="https://en.wikipedia.org/wiki/WAV" target="_blank" rel="noopener noreferrer">WAVE</a> (usually refered to as WAV). And others support both audio and video, like <a href="https://www.webmproject.org/" target="_blank" rel="noopener noreferrer">WebM</a>.
+We can think of an audio file like a stream of data elements wrapped in a container. This container is formally called a <a href="https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Containers" target="_blank" rel="noopener noreferrer">media container format</a>, and it's basically a _file format_ (think file type) that can store different types of data elements (bits).<br/>
+The container describes how this data "coexists" in a file. Some container formats only support audio, like <a href="https://en.wikipedia.org/wiki/WAV" target="_blank" rel="noopener noreferrer">WAVE</a> (usually referred to as WAV). And others support both audio and video, like <a href="https://www.webmproject.org/" target="_blank" rel="noopener noreferrer">WebM</a>.
 
 So a container "wraps" data to store it in a file, but information can be stored in different ways. And we'll also want to _compress_ the data to optimize for storage and/or bandwith by _encoding_ it (converting it from one "form" to another).<br/>
-This is where a _codec_ (**co**der/**dec**oder) comes into play. It handles all the processing that's required to encode (compress) and decode (decompress) the audio data.
+This is where a _codec_ (**co**der/**dec**oder) comes into play. It handles all the processing that's required to _encode_ (compress) and _decode_ (decompress) the audio data.
 
-Therefore, in order to define the format of an audio file (or video file), we need both a container and a codec. For example, when the MPEG-1 Audio Layer III codec is used to store only audio data in an <a href="https://en.wikipedia.org/wiki/MPEG-4" target="_blank" rel="noopener noreferrer">MPEG-4</a> container, we get an MP3 file (even though it's technically still an MPEG format file).
+Therefore, in order to define the format of an audio file (or video file for that matter), we need both a container and a codec. For example, when the MPEG-1 Audio Layer 3 codec is used to store only audio data in an <a href="https://en.wikipedia.org/wiki/MPEG-4" target="_blank" rel="noopener noreferrer">MPEG-4</a> container, we get an <a href="https://en.wikipedia.org/wiki/MP3" target="_blank" rel="noopener noreferrer">MP3</a> file (even though it's technically still an MPEG format file).
 
 > Fun fact: a container is not always required!
 >
-> "<a href="https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API " target="_blank" rel="noopener noreferrer">WebRTC</a> does not use a container at all. Instead, it streams the encoded audio and video tracks directly from one peer to another using `MediaStreamTrack` objects to represent each track."
->
-> <a href="https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Containers" target="_blank" rel="noopener noreferrer">MDN web docs</a>
+> "<a href="https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API " target="_blank" rel="noopener noreferrer">WebRTC</a> does not use a container at all. Instead, it streams the encoded audio and video tracks directly from one peer to another using `MediaStreamTrack` objects to represent each track."--from <a href="https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Containers" target="_blank" rel="noopener noreferrer">MDN web docs</a>
 
-So what does transcoding mean? If we convert one encoding into another, this process is called _transcoding_. And if we convert one container format into another, this process is called _transmuxing_.
+So what does _transcoding_ mean? It's the process of converting one encoding into another. And if we convert one container format into another, this process is called _transmuxing_.
 
-There are a lot of codecs available, where each codec will have a different effect on the _quality_, _size_ and _compatibility_ of the audio file. If you'd like to learn more about audio codecs, I recommend reading the <a href="https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Audio_codecs" target="_blank" rel="noopener noreferrer">Mozilla web audio codec guide</a>.
+There are a lot of codecs available, and each codec will have a different effect on the _quality_, _size_ and/or _compatibility_ of the audio file. If you'd like to learn more about audio codecs, I recommend reading the <a href="https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Audio_codecs" target="_blank" rel="noopener noreferrer">Mozilla web audio codec guide</a>.
 
 ### Why do you need to transcode audio?
 
 You might be wondering (like I was), if we can record audio directly in the browser, and immediately use the result in our app, why do we even have to transcode it?<br/>
-The answer is to optimize for compatibility, because the Media Recording API can't record audio in all media formats.<br/>
-Which formats are supported depend on the user agent (i.e. browser) and their specific implementation of the Media Recording API.
+The answer is to optimize for _compatibility_, because the Media Recording API _cannot record_ audio in all media formats.
 
-We can use the <a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder/isTypeSupported" target="_blank" rel="noopener noreferrer">isTypeSupported</a> method to figure out if we can record in a specific media type by providing it with a <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types" target="_blank" rel="noopener noreferrer">MIME</a> type.<br/>
-<a href="https://en.wikipedia.org/wiki/MP3" target="_blank" rel="noopener noreferrer">MP3</a> has good compatibility, but isn't supported by the Media Recording API. If we run the following code in the web console (Firefox or Chrome), we'll get:
+For example, MP3 has good compatibility across browsers and devices for playback, but is _not_ supported by the Media Recording API. What formats are supported depend on the browser's specific implementation of the Media Recording API.
+
+We can use the <a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder/isTypeSupported" target="_blank" rel="noopener noreferrer">isTypeSupported</a> method to figure out if we can record in a specific media type, by providing it with a <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types" target="_blank" rel="noopener noreferrer">MIME</a> type.<br/>
+We can run the following code in the web console (e.g. in Firefox or Chrome) to see it in action:
 
 ```js
 MediaRecorder.isTypeSupported('audio/mpeg'); // false
 ```
 
-Okay, what can we use then? WebM is supported:
+Okay, MP3 is indeed not supported. Which format can we use to record in then? It looks like WebM is a good choice:
 
 ```js
 MediaRecorder.isTypeSupported('audio/webm'); // true
 ```
 
-You can even specify the codec in addition to the container:
+Bonus round--you can even specify the codec in addition to the container:
 
 ```js
 MediaRecorder.isTypeSupported('audio/webm;codecs=opus'); // true
 ```
 
-So if we want to end up with MP3 files (MPEG-4 container + MPEG-1 Audio Layer III codec) of the recordings (to maximize compatibility), we need to transcode (and technically also transmux) the WebM files.
+So if we want to end up with MP3 files of the recordings, we need to transcode (and technically also transmux) the WebM files.
 
 ## In closing
 
