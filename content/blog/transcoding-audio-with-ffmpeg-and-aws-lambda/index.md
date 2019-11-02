@@ -363,10 +363,11 @@ In the previous step, we configured our Lambda to be executed whenever an object
 }
 ```
 
-The `s3` object will contain a property called `key`, which is the "name" of the file that was created in the input bucket. For example, if we upload a file named `test.wemb` to the S3 bucket, the value of `key` will be the string `test.webm`.<br />
+The `s3` object will contain a property called `key`, which is the "name" of the file that was created in the input bucket.<br/>
+For example, if we upload a file named `test.wemb` to the S3 bucket, the value of `key` will be the (URL encoded) string `test.webm`.<br />
 You can see the entire event message structure in the <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/notification-content-structure.html" target="_blank" rel="noopener noreferrer">AWS S3 docs</a>.
 
-One thing to note, you might get _more_ than one `Record`. So always process all of them:
+Also be aware that you can get **more than one** `Record`--always process all of them:
 
 ```js
 'use strict';
@@ -386,7 +387,10 @@ module.exports.elasticTranscoderToMp3 = async event => {
       if (!key) {
         continue;
       }
-      // We'll use the "key" to tell Amazon Elastic Transcoder
+      // Keys are sent as URI encoded strings
+      // If keys are not decoded, they will not be found in their buckets
+      const decodedKey = decodeURIComponent(key);
+      // We'll use the "decodedKey" to tell Amazon Elastic Transcoder
       // which file to transcode
       // highlight-end
     }
@@ -431,7 +435,10 @@ module.exports.elasticTranscoderToMp3 = async event => {
       if (!key) {
         continue;
       }
-      // We'll use the "key" to tell Amazon Elastic Transcoder
+      // Keys are sent as URI encoded strings
+      // If keys are not decoded, they will not be found in their buckets
+      const decodedKey = decodeURIComponent(key);
+      // We'll use the "decodedKey" to tell Amazon Elastic Transcoder
       // which file to transcode
     }
   } catch (err) {
@@ -469,17 +476,20 @@ module.exports.elasticTranscoderToMp3 = async event => {
       if (!key) {
         continue;
       }
+      // Keys are sent as URI encoded strings
+      // If keys are not decoded, they will not be found in their buckets
+      const decodedKey = decodeURIComponent(key);
 
       // highlight-start
       await transcoderClient
         .createJob({
           PipelineId: TRANSCODE_AUDIO_PIPELINE_ID,
           Input: {
-            Key: key
+            Key: decodedKey
           },
           Outputs: [
             {
-              Key: key.replace('webm', 'mp3'),
+              Key: decodedKey.replace('webm', 'mp3'),
               PresetId: TRANSCODER_MP3_PRESET_ID
             }
           ]
