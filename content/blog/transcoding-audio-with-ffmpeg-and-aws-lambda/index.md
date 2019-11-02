@@ -81,7 +81,15 @@ We'll explore two implementations that both transform a WebM audio file into MP3
 - [Using Amazon Elastic Transcoder](#using-amazon-elastic-transcoder).
 - [Using FFmpeg + AWS Lambda Layers](#using-ffmpeg--aws-lambda-layers).
 
-For both implementations we'll use the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>, and <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> to write the code for our <a href="https://aws.amazon.com/lambda/" target="_blank" rel="noopener noreferrer">Lambda</a> functions. Additionally, we'll need two <a href="https://aws.amazon.com/s3/" target="_blank" rel="noopener noreferrer">S3</a> buckets to store audio files:
+For both implementations we'll use the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>, and <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> to write the code for our <a href="https://aws.amazon.com/lambda/" target="_blank" rel="noopener noreferrer">Lambda</a> functions.
+
+Make sure you have Node.js installed, and then use <a href="https://www.npmjs.com/" target="_blank" rel="noopener noreferrer">npm</a> to install the Serverless Framework globally:
+
+```shell
+npm i -G serverless
+```
+
+Additionally, we'll need two <a href="https://aws.amazon.com/s3/" target="_blank" rel="noopener noreferrer">S3</a> buckets to store audio files:
 
 - An _input_ bucket for the "raw" WebM recordings.
 - An _output_ bucket for the transcoded MP3 recordings.
@@ -93,11 +101,10 @@ This is a fully managed and highly scalable AWS service, and we'll have to go th
 1. [Create a pipeline.](#1-create-a-pipeline)
 2. [Choose a preset.](#2-choose-a-preset)
 3. [Create an IAM Policy.](#3-create-an-iam-policy)
-4. [Setup a Node.js project.](#4-setup-a-nodejs-project)
-5. [Create a Serverless manifest.](#5-create-a-serverless-manifest)
-6. [Implement the Lambda function.](#6-implement-the-lambda-function)
-7. [Release the Lambda function.](#7-release-the-lambda-function)
-8. [Trigger a transcoder job.](#8-trigger-a-transcoder-job)
+4. [Create a Serverless project.](#4-create-a-serverless-project)
+5. [Implement the Lambda function.](#5-implement-the-lambda-function)
+6. [Release the Lambda function.](#6-release-the-lambda-function)
+7. [Trigger a transcoder job.](#7-trigger-a-transcoder-job)
 
 #### 1. Create a pipeline
 
@@ -164,7 +171,7 @@ We'll have to create a new _IAM Policy_ with the following configuration:
 
 After the Policy has been created, attach it to `Elastic_Transcoder_Default_Role`.
 
-#### 4. Setup a Node.js project
+#### 4. Create a Serverless project
 
 Create a new project named "audio-transcoder":
 
@@ -172,34 +179,10 @@ Create a new project named "audio-transcoder":
 mkdir audio-transcoder
 ```
 
-Move to this directory and initialize a new <a href="https://www.npmjs.com/" target="_blank" rel="noopener noreferrer">npm</a> project with:
-
-```shell
-npm init -y
-```
-
-This creates a `package.json` file in your project root:
+Move into this directory and create a `serverless.yml` file in your project root:
 
 ```shell
 audio-transcoder
-  └── package.json # highlight-line
-```
-
-We'll use the Serverless Framework to configure and upload the Lambda to AWS, so install it as a "dev" dependency:
-
-```shell
-npm i -D serverless
-```
-
-#### 5. Create a Serverless manifest
-
-Create a `serverless.yml` file in your project root:
-
-```shell
-audio-transcoder
-  ├── node_modules
-  ├── package-lock.json
-  ├── package.json
   └── serverless.yml # highlight-line
 ```
 
@@ -319,15 +302,12 @@ functions:
 
 This is the minimal configuration you need to get started. But if you'd like to learn more, I recommend you read the <a href="https://serverless.com/framework/docs/providers/aws/guide/serverless.yml/" target="_blank" rel="noopener noreferrer">Serverless manifest</a> and <a href="https://serverless.com/framework/docs/providers/aws/events/s3/" target="_blank" rel="noopener noreferrer">S3 event configuration</a> docs.
 
-#### 6. Implement the Lambda function
+#### 5. Implement the Lambda function
 
 In order to match the Lambda function definition in the Serverless manifest, create a file named `handler.js` in `src`:
 
 ```shell
 audio-transcoder
-  ├── node_modules
-  ├── package-lock.json
-  ├── package.json
   ├── serverless.yml
   └── src
       └── handler.js # highlight-line
@@ -505,69 +485,15 @@ module.exports.elasticTranscoderToMp3 = async event => {
 
 You can read more about the `createJob` API in the <a href="https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/ElasticTranscoder.html#createJob-property" target="_blank" rel="noopener noreferrer">AWS JavaScript SDK</a> docs.
 
-#### 7. Release the Lambda function
+#### 6. Release the Lambda function
 
-Add a release command to the `package.json` file:
-
-```json
-{
-  "name": "audio-transcoder",
-  "version": "1.0.0",
-  "description": "Convert WebM audio into MP3.",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "release": "serverless deploy --region eu-west-1 --stage prod" // highlight-line
-  },
-  "author": "Daniël Illouz (https://www.danillouz.dev/)",
-  "license": "MIT",
-  "devDependencies": {
-    "serverless": "^1.56.1"
-  }
-}
-```
-
-In order to upload the Lambda to AWS, make sure you have your <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html" target="_blank" rel="noopener noreferrer">credentials configured</a>, and then run:
+In order to upload the Lambda to AWS, make sure you have your <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html" target="_blank" rel="noopener noreferrer">credentials configured</a>, and then run the following command from the project root:
 
 ```shell
-npm run release
+sls deploy --region eu-west-1 --stage prod
 ```
 
-You should see something like this in your terminal:
-
-```
-Serverless: Packaging service...
-Serverless: Excluding development dependencies...
-Serverless: Installing dependencies for custom CloudFormation resources...
-Serverless: Creating Stack...
-Serverless: Checking Stack create progress...
-.....
-Serverless: Stack create finished...
-Serverless: Uploading CloudFormation file to S3...
-Serverless: Uploading artifacts...
-Serverless: Uploading service audio-transcoder.zip file to S3 (68.55 KB)...
-Serverless: Uploading custom CloudFormation resources...
-Serverless: Validating template...
-Serverless: Updating Stack...
-Serverless: Checking Stack update progress...
-....................................
-Serverless: Stack update finished...
-Service Information
-service: audio-transcoder
-stage: prod
-region: eu-west-1
-stack: audio-transcoder-prod
-resources: 10
-api keys:
-  None
-endpoints:
-  None
-functions:
-  elasticTranscoderToMp3: audio-transcoder-prod-elasticTranscoderToMp3
-layers:
-  None
-```
-
-#### 8. Trigger a transcoder job
+#### 7. Trigger a transcoder job
 
 With everything up and running, we can now upload a WebM audio file to our input bucket. In the AWS web console, navigate to the "S3" service:
 
