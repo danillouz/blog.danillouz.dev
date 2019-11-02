@@ -289,8 +289,8 @@ package:
 
 # highlight-start
 functions:
-  elasticTranscoderToMp3:
-    handler: src/handler.elasticTranscoderToMp3
+  transcodeToMp3:
+    handler: src/handler.transcodeToMp3
     description: Transcode an audio file to MP3
     events:
       - s3:
@@ -313,12 +313,12 @@ audio-transcoder
       └── handler.js # highlight-line
 ```
 
-And in `src/handler.js` export a method named `elasticTranscoderToMp3`:
+And in `src/handler.js` export a method named `transcodeToMp3`:
 
 ```js
 'use strict';
 
-module.exports.elasticTranscoderToMp3 = async () => {
+module.exports.transcodeToMp3 = async () => {
   try {
     // Implementation goes here
   } catch (err) {
@@ -353,7 +353,7 @@ Also be aware that you can get **more than one** `Record`--always process all of
 'use strict';
 
 // highlight-start
-module.exports.elasticTranscoderToMp3 = async event => {
+module.exports.transcodeToMp3 = async event => {
   // highlight-end
   try {
     // highlight-start
@@ -403,7 +403,7 @@ const transcoderClient = new ElasticTranscoder({
 });
 // highlight-end
 
-module.exports.elasticTranscoderToMp3 = async event => {
+module.exports.transcodeToMp3 = async event => {
   try {
     for (const Record of event.Records) {
       const { s3 } = Record;
@@ -444,7 +444,7 @@ const transcoderClient = new ElasticTranscoder({
   region: ELASTIC_TRANSCODER_REGION
 });
 
-module.exports.elasticTranscoderToMp3 = async event => {
+module.exports.transcodeToMp3 = async event => {
   try {
     for (const Record of event.Records) {
       const { s3 } = Record;
@@ -519,13 +519,22 @@ If it has status "Complete", we should have a `test.mp3` file in our output buck
 
 ### Using FFmpeg + AWS Lambda Layers
 
-FFmpeg is a cross-platform solution to convert audio and video. And since it's a binary, we can use a Lambda Layer to execute it from our Lambda function. We'll have to go through the following steps to get it up and running:
+FFmpeg is a cross-platform solution to convert audio and video. And since it's a binary, we can use a Lambda Layer to execute it from our Lambda function.
+
+Since we are still converting a WebM audio file to MP3 whenever a file is uploaded to our input bucket, we can reuse our `audio-transcoder` project by making a few changes:
+
+- Replace Amazon Elastic Transcoder with FFmpeg.
+- Get the WebM audio file from the input bucket "ourselves".
+- Transform the WebM file into MP3 using FFmpeg.
+- Write the MP3 file to the output bucket "ourselves".
+
+We'll have to go through the following steps to get this up and running:
 
 1. [Create and publish the FFmpeg Lambda Layer.](#1-create-and-publish-the-ffmpeg-lambda-layer)
-2. [Update the audio-transcoder project.](#2-update-the-audio-transcoder-project)
-3. [Implement the Lambda function.](#3-implement-the-lambda-function)
-4. [Release the Lambda function.](#4-release-the-lambda-function)
-5. [Trigger a transcoder job.](#5-trigger-a-transcoder-job)
+2. [Update the Serverless manifest.](#2-update-the-serverless-manifest)
+3. [Update the Lambda function.](#3-update-the-lambda-function)
+4. [Release the updated Lambda function.](#4-release-the-updated-lambda-function)
+5. [Trigger another transcoder job.](#5-trigger-another-transcoder-job)
 
 #### 1. Create and publish the FFmpeg Lambda Layer
 
@@ -630,13 +639,139 @@ When Serverless finishes deploying, navigate to the "Lambda" service in the AWS 
   <figcaption>Information about the published ffmpeg layer.</figcaption>
 </figure>
 
-#### 2. Update the audio-transcoder project
+#### 2. Update the Serverless manifest
 
-#### 3. Implement the Lambda function
+> Note that we're now modifying the manifest file of the `audio-transcoder`.
 
-#### 4. Release the Lambda function
+First we modify the environment variables, and add the names of the input- and output buckets:
 
-#### 5. Trigger a transcoder job
+```yml
+service: audio-transcoder
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  environment:
+    S3_INPUT_BUCKET_NAME: 'raw.recordings' # highlight-line
+    S3_OUTPUT_BUCKET_NAME: 'transcoded.recordings' # highlight-line
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - elastictranscoder:CreateJob
+      Resource:
+        - YOUR_PIPELINE_ARN
+        - YOUR_PRESET_ARN
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+
+functions:
+  transcodeToMp3:
+    handler: src/handler.transcodeToMp3
+    description: Transcode an audio file to MP3
+    events:
+      - s3:
+          bucket: 'raw.recordings'
+          event: 's3:ObjectCreated:*'
+          existing: true
+```
+
+Then we modify the IAM permissions, so our Lambda function can read from the input bucket, and write to the output bucket:
+
+```yml
+service: audio-transcoder
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  environment:
+    S3_INPUT_BUCKET_NAME: 'raw.recordings'
+    S3_OUTPUT_BUCKET_NAME: 'transcoded.recordings'
+  iamRoleStatements:
+    # highlight-start
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+      Resource: arn:aws:s3:::raw.recordings/*
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+      Resource: arn:aws:s3:::transcoded.recordings/*
+    # highlight-end
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+
+functions:
+  transcodeToMp3:
+    handler: src/handler.transcodeToMp3
+    description: Transcode an audio file to MP3
+    events:
+      - s3:
+          bucket: 'raw.recordings'
+          event: 's3:ObjectCreated:*'
+          existing: true
+```
+
+And finally, we configure our Lambda function to use the ffmpeg layer (we need the ARN from [step 1](#1-create-and-publish-the-ffmpeg-lambda-layer)):
+
+```yml
+service: audio-transcoder
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  environment:
+    S3_INPUT_BUCKET_NAME: 'raw.recordings'
+    S3_OUTPUT_BUCKET_NAME: 'transcoded.recordings'
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+      Resource: arn:aws:s3:::raw.recordings/*
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+      Resource: arn:aws:s3:::transcoded.recordings/*
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+
+functions:
+  transcodeToMp3:
+    handler: src/handler.transcodeToMp3
+    description: Transcode an audio file to MP3
+    events:
+      - s3:
+          bucket: 'raw.recordings'
+          event: 's3:ObjectCreated:*'
+          existing: true
+    # highlight-start
+    layers:
+      - YOUR_FFMPEG_LAYER_ARN # Replace this with the ARN from step 1
+    # highlight-end
+```
+
+#### 3. Update the Lambda function
+
+#### 4. Release the updated Lambda function
+
+#### 5. Trigger another transcoder job
 
 ## In closing
 
