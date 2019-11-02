@@ -519,6 +519,118 @@ If it has status "Complete", we should have a `test.mp3` file in our output buck
 
 ### Using FFmpeg + AWS Lambda Layers
 
+FFmpeg is a cross-platform solution to convert audio and video. And since it's a binary, we can use a Lambda Layer to execute it from our Lambda function. We'll have to go through the following steps to get it up and running:
+
+1. [Create and publish the FFmpeg Lambda Layer.](#1-create-and-publish-the-ffmpeg-lambda-layer)
+2. [Update the Serverless manifest.](#2-update-the-serverless-manifest)
+3. [Implement the Lambda function.](#3-implement-the-lambda-function)
+4. [Release the Lambda function.](#4-release-the-lambda-function)
+5. [Trigger a transcoder job.](#5-trigger-a-transcoder-job)
+
+#### 1. Create and publish the FFmpeg Lambda Layer
+
+Lambda Layers allow us to "pull in" extra dependencies into our Lambda functions. A layer is basically a ZIP archive that contains some code. And in order to use a layer, we first must create and publish one.<br/>
+After we publish a layer, we can configure any Lambda function to use it. AWS will then extract the layer to a special directory called `/opt`, and the Lambda function runtime will be able to execute it.
+
+> "Note that a Lambda function can use up to 5 layers at a time."--from <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html" target="_blank" rel="noopener noreferrer">Lambda Layers docs</a>
+
+The Serverless Framework makes it very easy to work with layers. To get started, create a new project named "lambda-layers":
+
+```shell
+mkdir lambda-layers
+```
+
+Move to this directory and create a `serverless.yml` file in your project root:
+
+```shell
+lambda-layers
+  └── serverless.yml # highlight-line
+```
+
+Add the following content to it:
+
+```yml
+service: lambda-layers
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+
+package:
+  exclude:
+    - ./*
+  include:
+    - layers
+
+layers:
+  ffmpeg:
+    path: layers
+    description: FFmpeg binary
+    compatibleRuntimes:
+      - nodejs10.x
+    licenseInfo: GPL v2+, for more info see https://github.com/FFmpeg/FFmpeg/blob/master/LICENSE.md
+```
+
+The layer is named `ffmpeg` and the `path` propery dictates that the layer code will reside in a directory name `layers`. We'll have to match this in our project structure:
+
+```shell
+mkdir layers
+```
+
+Move into this directory and download a static build of FFmpeg from <a href="https://johnvansickle.com/ffmpeg/">johnvansickle.com/ffmpeg</a>. These builds are compatible with Amazon Linux 2--the operating system on which Lambda runs when the `Node.js 10.x` runtime is used. Specifically, use the `ffmpeg-git-amd64-static.tar.xz` master build:
+
+```shell
+curl -O https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
+```
+
+Extract the files from the downloaded archive:
+
+```shell
+tar -xvf ffmpeg-git-amd64-static.tar.xz
+```
+
+Remove the archive:
+
+```shell
+rm ffmpeg-git-amd64-static.tar.xz
+```
+
+And rename the extracted directory to `ffmpeg`, so it matches the configured layer name in our Serverless manifest:
+
+```shell
+mv ffmpeg-git-20191029-amd64-static ffmpeg
+```
+
+You should now have the following folder structure:
+
+```shell
+lambda-layers
+  ├── layers # highlight-line
+  │   └── ffmpeg # highlight-line
+  │       ├── GPLv3.txt
+  │       ├── ffmpeg # highlight-line
+  │       ├── ffprobe
+  │       ├── manpages
+  │       ├── model
+  │       ├── qt-faststart
+  │       └── readme.txt
+  └── serverless.yml
+```
+
+We can now publish the FFmpeg layer by running the following command from the project root:
+
+```shell
+sls deploy --region eu-west-1 --stage prod
+```
+
+#### 2. Update the Serverless manifest.
+
+#### 3. Implement the Lambda function.
+
+#### 4. Release the Lambda function.
+
+#### 5. Trigger a transcoder job.
+
 ## In closing
 
 In this post I showed you a way to implement "serverless audio transcoding".
