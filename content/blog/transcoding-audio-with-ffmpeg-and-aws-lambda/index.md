@@ -522,7 +522,7 @@ If it has status "Complete", we should have a `test.mp3` file in our output buck
 FFmpeg is a cross-platform solution to convert audio and video. And since it's a binary, we can use a Lambda Layer to execute it from our Lambda function. We'll have to go through the following steps to get it up and running:
 
 1. [Create and publish the FFmpeg Lambda Layer.](#1-create-and-publish-the-ffmpeg-lambda-layer)
-2. [Update the Serverless manifest.](#2-update-the-serverless-manifest)
+2. [Update the audio-transcoder project.](#2-update-the-audio-transcoder-project)
 3. [Implement the Lambda function.](#3-implement-the-lambda-function)
 4. [Release the Lambda function.](#4-release-the-lambda-function)
 5. [Trigger a transcoder job.](#5-trigger-a-transcoder-job)
@@ -623,13 +623,20 @@ We can now publish the FFmpeg layer by running the following command from the pr
 sls deploy --region eu-west-1 --stage prod
 ```
 
-#### 2. Update the Serverless manifest.
+When Serverless finishes deploying, navigate to the "Lambda" service in the AWS web console, and click on "Layers". Here we should see our published ffmpeg layer. Click on it and take note of the "ARN", we'll need it to condifure our Lambda function in the next step.
 
-#### 3. Implement the Lambda function.
+<figure>
+  <img src="./img/published-layer.png" alt="Image of the published ffmpeg layer.">
+  <figcaption>Information about the published ffmpeg layer.</figcaption>
+</figure>
 
-#### 4. Release the Lambda function.
+#### 2. Update the audio-transcoder project
 
-#### 5. Trigger a transcoder job.
+#### 3. Implement the Lambda function
+
+#### 4. Release the Lambda function
+
+#### 5. Trigger a transcoder job
 
 ## In closing
 
