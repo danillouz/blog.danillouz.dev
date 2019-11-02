@@ -6,7 +6,7 @@ description: 'Exploring a scalable and cost-effective serverless audio transcodi
 
 ## TL;DR
 
-For my side project I'm transforming WebM audio files into MP3. I initially started doing this with <a href="https://aws.amazon.com/elastictranscoder/" target="_blank" rel="noopener noreferrer">Amazon Elastic Transcoder</a>, which works pretty well. But after transcoding the same audio files with <a href="https://www.ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a> + <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html" target="_blank" rel="noopener noreferrer">AWS Lambda Layers</a>, my initial testing shows that this implementation is around **3653 times cheaper** than Amazon Elastic Transcoder--at least for _short audio files_ that have a maximum duration of 3 minutes.
+For my side project I'm transforming WebM audio files into MP3. I initially started doing this with <a href="https://aws.amazon.com/elastictranscoder/" target="_blank" rel="noopener noreferrer">Amazon Elastic Transcoder</a>, which works pretty well. But after doing the same with <a href="https://www.ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a> + <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html" target="_blank" rel="noopener noreferrer">AWS Lambda Layers</a>, my initial testing shows that this implementation is around **3653 times cheaper**--at least for _short audio files_ that have a max duration of 3 min.
 
 If you want to see the code for the audio transcoder, go to <a href="https://github.com/upstandfm/audio-transcoder" target="_blank" rel="noopener noreferrer">github.com/upstandfm/audio-transcoder</a>.
 
@@ -21,9 +21,10 @@ If you want to see the code for the audio transcoder, go to <a href="https://git
 
 I recently started working on a new side project called <a href="https://www.upstand.fm/" target="_blank" rel="noopener noreferrer">Upstand FM</a>. It's a web app that allows you to record your voice, so other users of the app can listen to what you have to say.
 
-In the app I used the <a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaStream_Recording_API" target="_blank" rel="noopener noreferrer">MediaStream Recording API</a> (aka Media Recording API) to easily record audio from the user's input device. It works really well, and you don't have to use any external libraries!<br/>
-What's the catch then? Well, it only works in Firefox, Chrome and Opera. Hopefully it will soon also work in Safari--at the time of this writing you have to enable it via an experimental feature flag called "MediaRecorder", but not all events are supported. This means that the implementation you got working in Firefox or Chrome, probably won't work in Safari.<br/>
-Even though that's a bit disappointing, I was okay with it for my use case.
+In the app I use the <a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaStream_Recording_API" target="_blank" rel="noopener noreferrer">MediaStream Recording API</a> (aka Media Recording API) to easily record audio from the user's input device. It works really well, and you don't have to use any external libraries!<br/>
+There's one catch though--it only works in Firefox, Chrome and Opera. And at the time of this writing, it "sort of" works in Safari (it's hidden behind a feature flag and not all events are supported). Even though that's a bit disappointing, I'm okay with it for my use case.
+
+So after I had built something functional that allowed me to record my voice, it turned out that the audio file I ended up with had to be _transcoded_ if I wanted to listen to it across a wide range of browsers and devices. And thus my adventure began.
 
 ## What does transcoding even mean?
 
@@ -35,13 +36,13 @@ The container describes how this data "coexists" in a file. Some container forma
 So a container "wraps" data to store it in a file, but information can be stored in different ways. And we'll also want to _compress_ the data to optimize for storage and/or bandwith by _encoding_ it (converting it from one "form" to another).<br/>
 This is where a _codec_ (**co**der/**dec**oder) comes into play. It handles all the processing that's required to _encode_ (compress) and _decode_ (decompress) the audio data.
 
-Therefore, in order to define the format of an audio file (or video file for that matter), we need both a container and a codec. For example, when the MPEG-1 Audio Layer 3 codec is used to store only audio data in an <a href="https://en.wikipedia.org/wiki/MPEG-4" target="_blank" rel="noopener noreferrer">MPEG-4</a> container, we get an <a href="https://en.wikipedia.org/wiki/MP3" target="_blank" rel="noopener noreferrer">MP3</a> file (even though it's technically still an MPEG format file).
+Therefore, in order to define the format of an audio file (or a video file for that matter), we need both a container and a codec. For example, when the MPEG-1 Audio Layer 3 codec is used to store only audio data in an <a href="https://en.wikipedia.org/wiki/MPEG-4" target="_blank" rel="noopener noreferrer">MPEG-4</a> container, we get an <a href="https://en.wikipedia.org/wiki/MP3" target="_blank" rel="noopener noreferrer">MP3</a> file (even though it's technically still an MPEG format file).
 
 > Fun fact: a container is not always required!
 >
 > "<a href="https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API " target="_blank" rel="noopener noreferrer">WebRTC</a> does not use a container at all. Instead, it streams the encoded audio and video tracks directly from one peer to another using `MediaStreamTrack` objects to represent each track."--from <a href="https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Containers" target="_blank" rel="noopener noreferrer">MDN web docs</a>
 
-So what does _transcoding_ mean? It's the process of converting one encoding into another. And if we convert one container format into another, this process is called _transmuxing_.
+So what does transcoding mean? It's the process of converting one encoding into another. And if we convert one container format into another, this process is called _transmuxing_.
 
 There are a lot of codecs available, and each codec will have a different effect on the _quality_, _size_ and/or _compatibility_ of the audio file. If you'd like to learn more about audio codecs, I recommend reading the <a href="https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Audio_codecs" target="_blank" rel="noopener noreferrer">Mozilla web audio codec guide</a>.
 
@@ -59,7 +60,7 @@ We can run the following code in the web console (e.g. in Firefox or Chrome) to 
 MediaRecorder.isTypeSupported('audio/mpeg'); // false
 ```
 
-Okay, MP3 is indeed not supported. Which format can we use to record in then? It looks like WebM is a good choice:
+Okay, MP3 isn't supported. Which format can we use to record in then? It looks like WebM is a good choice:
 
 ```js
 MediaRecorder.isTypeSupported('audio/webm'); // true
@@ -71,7 +72,7 @@ Bonus round--you can even specify the codec in addition to the container:
 MediaRecorder.isTypeSupported('audio/webm;codecs=opus'); // true
 ```
 
-So if we want to end up with MP3 files of the recordings, we need to transcode (and technically also transmux) the WebM files.
+So if we want to end up with MP3 files of the recordings, we need to transcode (and technically also transmux) the WebM audio files.
 
 ## Transcoding audio
 
@@ -80,7 +81,7 @@ We'll explore two implementations that both transform a WebM audio file into MP3
 - [Using Amazon Elastic Transcoder](#using-amazon-elastic-transcoder).
 - [Using FFmpeg + AWS Lambda Layers](#using-ffmpeg--aws-lambda-layers).
 
-For both implementations we'll use the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>, and <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> to write the code for out <a href="https://aws.amazon.com/lambda/" target="_blank" rel="noopener noreferrer">Lambda</a> functions. Additionally, we'll need two <a href="https://aws.amazon.com/s3/" target="_blank" rel="noopener noreferrer">S3</a> buckets to store audio files:
+For both implementations we'll use the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>, and <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> to write the code for our <a href="https://aws.amazon.com/lambda/" target="_blank" rel="noopener noreferrer">Lambda</a> functions. Additionally, we'll need two <a href="https://aws.amazon.com/s3/" target="_blank" rel="noopener noreferrer">S3</a> buckets to store audio files:
 
 - An _input_ bucket for the "raw" WebM recordings.
 - An _output_ bucket for the transcoded MP3 recordings.
@@ -104,7 +105,7 @@ In the AWS web console, navigate to the "Elastic Transcoder" service. Select a r
 
 <figure>
   <img src="./img/create-pipeline.png" alt="Image of the Elastic Transcoder create pipeline form.">
-  <figcaption>Create a pipeline by providing a name, and an input- and output bucket.</figcaption>
+  <figcaption>Create a pipeline by providing a name, and input- and output buckets.</figcaption>
 </figure>
 
 > AWS asks you to provide a bucket for transcoded files and playlists, and thumbnails--you can use the same bucket for both.
@@ -120,11 +121,11 @@ Create the pipeline and take note of the "ARN" and "Pipeline ID". We'll need bot
 
 The pipeline we created in the previous step requires a <a href="https://docs.aws.amazon.com/elastictranscoder/latest/developerguide/working-with-presets.html" target="_blank" rel="noopener noreferrer">preset</a> to work. Presets contain settings we want to be applied during the transcoding process. And lucky for us, AWS already has system presets to create MP3 files.
 
-In the web console, click on "Presets" and filter on keyword "MP3". Select one and take note of the "ARN" and "Preset ID". Again, we'll need these to configure our Lambda function later on.
+In the web console, click on "Presets" and filter on keyword "MP3". Select one and take note of the "ARN" and "Preset ID". We'll also need these to configure our Lambda function later on.
 
 <figure>
   <img src="./img/preset.png" alt="Image of the Elastic Transcoder MP3 preset.">
-  <figcaption>AWS system preset for MP3 files.</figcaption>
+  <figcaption>AWS system preset for MP3 (128k) files.</figcaption>
 </figure>
 
 #### 3. Create an IAM Policy
@@ -220,7 +221,7 @@ package:
     - src
 ```
 
-We'll add the Elastic Transcoder Pipeline ID, MP3 Preset ID and region from [step 1](#1-create-a-pipeline) and [step 2](#2-choose-a-preset) as environment variables:
+We'll add the Elastic Transcoder Pipeline ID, MP3 Preset ID and region (from [step 1](#1-create-a-pipeline) and [step 2](#2-choose-a-preset)) as environment variables:
 
 ```yml
 service: audio-transcoder
@@ -244,7 +245,7 @@ package:
     - src
 ```
 
-And use the Elastic Transcoder Pipeline ARN and MP3 Preset ARN, from [step 1](#1-create-a-pipeline) and [step 2](#2-choose-a-preset), to configure our Lambda with the required IAM permissions to create transcoder jobs:
+We'll also use the Elastic Transcoder Pipeline ARN and MP3 Preset ARN (from [step 1](#1-create-a-pipeline) and [step 2](#2-choose-a-preset)) to configure our Lambda with the required IAM permissions, so it can create transcoder jobs:
 
 ```yml
 service: audio-transcoder
@@ -275,7 +276,7 @@ package:
     - src
 ```
 
-Finally, we add the Lambda function definition. This Lambda will be executed whenever an object is created in our input bucket:
+Finally, we add the Lambda function definition--this Lambda will be executed whenever an object is created in our input bucket:
 
 ```yml
 service: audio-transcoder
@@ -346,7 +347,7 @@ module.exports.elasticTranscoderToMp3 = async () => {
 };
 ```
 
-In the previous step, we configured our Lambda to be executed whenever an object is created in the input bucket. This means AWS will call the Lambda with an `event` message, and this object will contain a list of `Records`, where each `Record` contains an `s3` object with information about the `s3:ObjectCreated` event:
+In the previous step, we configured our Lambda to be executed whenever an object is created in the input bucket. This means that AWS will call the Lambda with an `event` message that contains a list of `Records`. And each `Record` will contain an `s3` object with information about the `s3:ObjectCreated` event:
 
 ```js
 // "event" object:
@@ -362,10 +363,10 @@ In the previous step, we configured our Lambda to be executed whenever an object
 }
 ```
 
-The `s3` object will contain a property called `key`, which is the "name" of the file that was created in the input bucket. For example, if we upload a file named `test.wemb` to the S3 bucket, the value of `key` will be a string `test.webm`.<br />
+The `s3` object will contain a property called `key`, which is the "name" of the file that was created in the input bucket. For example, if we upload a file named `test.wemb` to the S3 bucket, the value of `key` will be the string `test.webm`.<br />
 You can see the entire event message structure in the <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/notification-content-structure.html" target="_blank" rel="noopener noreferrer">AWS S3 docs</a>.
 
-One thing to note, you might get _more_ than one `Record`. So always iterate through-, and process all of them:
+One thing to note, you might get _more_ than one `Record`. So always process all of them:
 
 ```js
 'use strict';
@@ -558,18 +559,16 @@ layers:
 
 #### 8. Trigger a transcoder job
 
-With everything up and running, we can now upload a WebM audio file to our input bucket, from the S3 web console.
-
-In the AWS web console, navigate to the "S3" service:
+With everything up and running, we can now upload a WebM audio file to our input bucket. In the AWS web console, navigate to the "S3" service:
 
 - Select your input bucket.
 - Click "Upload".
 - Add a WebM file.
 - Click on "Upload" again.
 
-> If you don't have a WebM file, but would like to try this out, you can use my <a href="./audio/test.webm" download>test.webm</a> file--it's a 3 minute recording of a podcast I was listening to.
+> If you don't have a WebM file, but would like to try this out, you can use my <a href="./audio/test.webm" download>test.webm</a> file--it's a 3 min. recording of a podcast I was listening to.
 
-This action will trigger an `s3:ObjectCreated` event, and AWS will execute the Lambda function we deployed in the previous step, which will schedule the transcoder job.
+This action will trigger an `s3:ObjectCreated` event and AWS will execute the Lambda function we deployed in the previous step, which will schedule a transcoder job.
 
 To get more details about a scheduled job, navigate to the "Elastic Transcoder" service in the AWS web console. Click on "Jobs", select your pipeline and click "Search".
 
@@ -580,7 +579,7 @@ You should see a job, select it for more information.
   <figcaption>Information about the created pipeline job.</figcaption>
 </figure>
 
-If it has status "Complete", we should have an `test.mp3` file in our output bucket!
+If it has status "Complete", we should have a `test.mp3` file in our output bucket!
 
 ### Using FFmpeg + AWS Lambda Layers
 
