@@ -519,16 +519,16 @@ If it has status "Complete", we should have a `test.mp3` file in our output buck
 
 ### Using FFmpeg + AWS Lambda Layers
 
-FFmpeg is a cross-platform solution to convert audio and video. And since it's a binary, we can use a Lambda Layer to execute it from our Lambda function.
+FFmpeg is a cross-platform solution that can be used to convert audio and video files. And since it's a binary, we'll use a Lambda Layer to execute it from our Lambda function.
 
-Since we are still converting a WebM audio file to MP3 whenever a file is uploaded to our input bucket, we can reuse our `audio-transcoder` project by making a few changes:
+Because we're still converting a WebM audio file to MP3 whenever a file is uploaded to our input bucket, we can reuse our `audio-transcoder` project by making a few changes:
 
 - Replace Amazon Elastic Transcoder with FFmpeg.
-- Get the WebM audio file from the input bucket "ourselves".
-- Transform the WebM file into MP3 using FFmpeg.
-- Write the MP3 file to the output bucket "ourselves".
+- Retrieve the WebM audio file from the input bucket, whenever a file is uploaded.
+- Convert the retrieved WebM file to MP3 using FFmpeg.
+- Write the converted MP3 file to the output bucket.
 
-We'll have to go through the following steps to get this up and running:
+We'll have to go through the following steps to make this happen:
 
 1. [Create and publish the FFmpeg Lambda Layer.](#1-create-and-publish-the-ffmpeg-lambda-layer)
 2. [Update the Serverless manifest.](#2-update-the-serverless-manifest)
@@ -539,7 +539,8 @@ We'll have to go through the following steps to get this up and running:
 
 #### 1. Create and publish the FFmpeg Lambda Layer
 
-Lambda Layers allow us to "pull in" extra dependencies into our Lambda functions. A layer is basically a ZIP archive that contains some code. And in order to use a layer, we first must create and publish one.<br/>
+Lambda Layers allow us to "pull in" extra dependencies into our Lambda functions. A layer is basically a ZIP archive that contains some code. And in order to use a layer, we first must create and publish one.
+
 After we publish a layer, we can configure any Lambda function to use it. AWS will then extract the layer to a special directory called `/opt`, and the Lambda function runtime will be able to execute it.
 
 > "Note that a Lambda function can use up to 5 layers at a time."--from <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html" target="_blank" rel="noopener noreferrer">Lambda Layers docs</a>
@@ -581,13 +582,17 @@ layers:
     licenseInfo: GPL v2+, for more info see https://github.com/FFmpeg/FFmpeg/blob/master/LICENSE.md
 ```
 
-The layer is named `ffmpeg` and the `path` propery dictates that the layer code will reside in a directory name `layers`. We'll have to match this in our project structure:
+The layer is named `ffmpeg` and the `path` propery dictates that the layer code will reside in a directory named `layers`. Match this structure in the project:
 
 ```shell
 mkdir layers
 ```
 
-Move into this directory and download a static build of FFmpeg from <a href="https://johnvansickle.com/ffmpeg/" target="_blank" rel="noopener noreferrer">johnvansickle.com/ffmpeg</a>. These builds are compatible with Amazon Linux 2--the operating system on which Lambda runs when the `Node.js 10.x` runtime is used. Specifically, use the `ffmpeg-git-amd64-static.tar.xz` master build:
+Move into this directory and download a static build of FFmpeg from <a href="https://johnvansickle.com/ffmpeg/" target="_blank" rel="noopener noreferrer">johnvansickle.com/ffmpeg</a>.
+
+> These FFmpeg builds are all compatible with Amazon Linux 2--the operating system on which Lambda runs when the `Node.js 10.x` <a href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html" target="_blank" rel="noopener noreferrer">runtime</a> is used.
+
+Use the recommended `ffmpeg-git-amd64-static.tar.xz` master build:
 
 ```shell
 curl -O https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
@@ -605,7 +610,7 @@ Remove the archive:
 rm ffmpeg-git-amd64-static.tar.xz
 ```
 
-And rename the extracted directory to `ffmpeg`, so it matches the configured layer name in our Serverless manifest:
+And rename the extracted directory to `ffmpeg`, so it matches the configured layer name in the manifest:
 
 ```shell
 mv ffmpeg-git-20191029-amd64-static ffmpeg
@@ -627,24 +632,24 @@ lambda-layers
   └── serverless.yml
 ```
 
-We can now publish the FFmpeg layer by running the following command from the project root:
+Now publish the FFmpeg layer by running the following command from the project root:
 
 ```shell
 sls deploy --region eu-west-1 --stage prod
 ```
 
-When Serverless finishes deploying, navigate to the "Lambda" service in the AWS web console, and click on "Layers". Here we should see our published ffmpeg layer. Click on it and take note of the "ARN", we'll need it to condifure our Lambda function in the next step.
+When Serverless finishes deploying, navigate to the "Lambda" service in the AWS web console, and click on "Layers". Here you should see the published FFmpeg layer. Click on it and take note of the "ARN", we'll need it to configure our Lambda function in the next step.
 
 <figure>
-  <img src="./img/published-layer.png" alt="Image of the published ffmpeg layer.">
-  <figcaption>Information about the published ffmpeg layer.</figcaption>
+  <img src="./img/published-layer.png" alt="Image of the published FFmpeg layer.">
+  <figcaption>Information about the published FFmpeg layer.</figcaption>
 </figure>
 
 #### 2. Update the Serverless manifest
 
-> Note that we're now modifying the manifest file of the `audio-transcoder`.
+> Note that we're now modifying the manifest file of the "audio-transcoder".
 
-First we modify the environment variables, and add the names of the input- and output buckets:
+First modify the environment variables, and add the names of the input- and output buckets:
 
 ```yml
 service: audio-transcoder
@@ -682,7 +687,7 @@ functions:
           existing: true
 ```
 
-Then we modify the IAM permissions, so our Lambda function can read from the input bucket, and write to the output bucket:
+Then we the IAM permissions, so the Lambda function can read from the input bucket, and write to the output bucket:
 
 ```yml
 service: audio-transcoder
@@ -724,7 +729,7 @@ functions:
           existing: true
 ```
 
-And finally, we configure our Lambda function to use the ffmpeg layer (we need the ARN from [step 1](#1-create-and-publish-the-ffmpeg-lambda-layer)):
+And configure the Lambda function to use the FFmpeg layer with the ARN from the [previous step](#1-create-and-publish-the-ffmpeg-lambda-layer):
 
 ```yml
 service: audio-transcoder
@@ -770,7 +775,7 @@ functions:
 
 #### 3. Update the Lambda function
 
-Since we have to read from our input bucket, and write to our output bucket, we replace the Elastic Transcoder client with the S3 client:
+Since we have to read from the input bucket, and write to the output bucket, replace the Elastic Transcoder client with the S3 client:
 
 ```js
 'use strict';
@@ -818,7 +823,7 @@ module.exports.transcodeToMp3 = async event => {
 };
 ```
 
-Then we use the `decodedKey` to get the WebM recording from our input bucket:
+Then use the `decodedKey` to get the WebM recording from the input bucket:
 
 ```js
 'use strict';
@@ -858,7 +863,7 @@ module.exports.transcodeToMp3 = async event => {
 };
 ```
 
-The S3 client returns an object that contains a `Body` property. The value of `Body` is a blob, which we'll feed to the ffmpeg layer and convert to an MP3. We'll create a small helper module called `ffmpeg` to do this. In `src` create a file named `ffmpeg.js`:
+The S3 client returns an object that contains a `Body` property. The value of `Body` is a blob, which we'll feed to the FFmpeg layer to convert to an MP3. We'll create a helper module called `ffmpeg` to do this. In `src` create a file named `ffmpeg.js`:
 
 ```shell
 audio-transcoder
@@ -868,7 +873,7 @@ audio-transcoder
       └── handler.js
 ```
 
-And export an object with a method called `convertWebmToMp3` which receives the WebM blob as a parameter:
+And export an object with a method called `convertWebmToMp3`, which receives the WebM blob as an argument:
 
 ```js
 'use strict';
@@ -880,7 +885,7 @@ module.exports = {
 };
 ```
 
-This module will spawn a <a href="https://nodejs.org/api/child_process.html#child_process_child_process_spawnsync_command_args_options" target="_blank" rel="noopener noreferrer">synchronous child process</a> that allows us to execute the `ffmpeg` "command" (provided by our ffmpeg layer):
+This module will spawn a <a href="https://nodejs.org/api/child_process.html#child_process_child_process_spawnsync_command_args_options" target="_blank" rel="noopener noreferrer">synchronous child process</a> that allows us to execute the `ffmpeg` "command" (provided by the FFmpeg layer):
 
 ```js
 'use strict';
@@ -893,7 +898,7 @@ module.exports = {
     spawnSync(
       '/opt/ffmpeg/ffmpeg', // "/opt/:LAYER_NAME/:BINARY_NAME"
       [
-        /* ffmpeg command arguments go here */
+        /* FFmpeg command arguments go here */
       ],
       { stdio: 'inherit' }
     );
@@ -902,11 +907,11 @@ module.exports = {
 };
 ```
 
-The ffmpeg command requires the file system to do its magic. And we'll use a special directory called `/tmp` for this.
+The `ffmpeg` command requires the file system to do its magic. And we'll use a "special" directory called `/tmp` for this.
 
 > The `/tmp` directory allows you to **temporarily** store up to <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html" target="_blank" rel="noopener noreferrer">512 MB</a>.
 
-First we write the WebM blob to `/tmp` so ffmpeg can read it, and then we tell ffmpeg to write the produced MP3 file to the same directory:
+First we'll write the WebM blob to `/tmp` so ffmpeg can read it, and then we'll tell FFmpeg to write the produced MP3 file to the same directory:
 
 ```js
 'use strict';
@@ -974,7 +979,7 @@ module.exports = {
 };
 ```
 
-And use the MP3 blob to write it to our output bucket:
+Finally, we'll use the MP3 blob to write it to the output bucket:
 
 ```js
 'use strict';
@@ -1035,32 +1040,32 @@ sls deploy --region eu-west-1 --stage prod
 
 #### 5. Trigger another transcoder job
 
-When we now upload a WebM file to the input bucket, the output bucket stays empty..
+When Serverless is done deploying, upload a WebM file to the input bucket. But why does the output bucket remain empty? Where's the MP3 file?
 
-Lets find out why this is the case by checking the Lambda function's log files in the AWS web console:
+Lets find out why this is happening by checking the Lambda function's log files in the AWS web console:
 
 - Go to the "Lambda" service.
-- Click on your function.
+- Click on the "audio-transcoder-prod-transcodeToMp3" function.
 - Click on the "Monitoring" tab.
 - Click the "View logs in CloudWatch" button.
 - Select the latest log group.
 
-Here you should the logs of your Lambda function:
+Here you should see the logs of the Lambda function:
 
 <figure>
   <img src="./img/logs-timeout.png" alt="CloudWatch logs of the Lambda function that's timing out.">
   <figcaption>The Lambda function stops executing after about 6 seconds.</figcaption>
 </figure>
 
-The logs tell us that FFmpeg is running, but that it doesn't complete! In the middle of the transcoding process the logs just say "END", and on the final line we see that the Lambda had a duration of `6006.17 ms`.
+The logs tell us that FFmpeg is executing, but that it doesn't complete! In the middle of the transcoding process the logs just say "END", and on the final line we see that the Lambda had a duration of `6006.17 ms`.
 
-What's happening is that our Lambda function takes "too long" to complete executing. By default the Lambda has a timeout of 6 seconds, which we can increase--at the time of this writing the maximum timeout can be set to <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html" target="_blank" rel="noopener noreferrer">900 seconds</a>.
+What's happening? Our Lambda function takes "too long" to finish executing. By default the Lambda has a timeout of 6 seconds (at the time of this writing it can be set to a maximum value of <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html" target="_blank" rel="noopener noreferrer">900 seconds</a>).
 
-So after 6 seconds our Lambda is still not done transcoding and AWS _terminates_ it. Therefore we must optimize our Lambda function!
+In other words, because of the default timeout, after 6 seconds our Lambda is still not done transcoding and AWS _terminates_ it. Therefore we must optimize our Lambda function!
 
 #### 6. Optimizing the Lambda function
 
-First lets just set the timout to a larger value, for example 3 minutes, so we can see how long it would actually take to complete the transcoding process:
+First lets just set the timeout to a larger value (for example 3 minutes) so we can see how long it would actually take to complete the transcoding process:
 
 ```yml
 service: audio-transcoder
@@ -1103,25 +1108,24 @@ functions:
       - YOUR_FFMPEG_LAYER_ARN
 ```
 
-And deploy again:
-
-```shell
-sls deploy --region eu-west-1 --stage prod
-```
-
-When Serverless is done, upload another WebM file and check the logs again:
+Deploy again, and when Serverless is done, upload another WebM file, and check the logs:
 
 <figure>
-  <img src="./img/logs-complete.png" alt="CloudWatch logs of the Lambda function that completes executing.">
-  <figcaption>The Lambda function completes executing after about 7 seconds.</figcaption>
+  <img src="./img/logs-complete.png" alt="CloudWatch logs of the Lambda function that finishes executing.">
+  <figcaption>The Lambda function finishes executing after about 7 seconds.</figcaption>
 </figure>
 
-This time we see FFmpeg completed the transcoding process, and that our Lambda had a duration of `7221.95 ms`. If we check the output bucket now, we see our transcoded MP3 file!
+This time we see FFmpeg completed the transcoding process, and that the Lambda had a duration of `7221.95 ms`. If we check the output bucket now, we'll see the MP3 file!
 
-But we can do better--something that's very important when using Lambda, is to _always_ performance test your function. You should always make sure that your Lambda function has the _optimum_ memory size congifured.<br/>
-When you choose a higher memory setting, AWS will also give you an equivalent CPU boost, which usually impacts the runtime duration! And in general, the function's memory + duration are the main factors that will affect your costs.
+##### Optimizing further
 
-By default our Lambda function has a memory setting of `1024 MB`, so lets double it and compare results:
+This isn't bad, but we can do better! Something that's very important when working with Lambda, is to _always_ performance test your functions--always make sure that a Lambda function has the _optimum_ memory size configured.
+
+This is important, because when you choose a higher memory setting, AWS will also give you an equivalent CPU boost! And this will usually positively impact the function's runtime duration.
+
+> In general, a Lambda function's **memory** and **duration** are the main factors that affect its costs.
+
+By default a Lambda function has a memory setting of `1024 MB`, so lets double it and compare results:
 
 ```yml
 service: audio-transcoder
@@ -1165,16 +1169,16 @@ functions:
       - YOUR_FFMPEG_LAYER_ARN
 ```
 
-Deploy again, and when Serverless is done, upload another WebM file and check the logs again:
+Deploy again, and when Serverless is done, upload another WebM file and check the logs:
 
 <figure>
   <img src="./img/logs-double-memory.png" alt="CloudWatch logs of the Lambda function with twice the memory.">
   <figcaption>The Lambda function with 2048 MB of memory completes in about 4 seconds.</figcaption>
 </figure>
 
-Great, its even faster now! Does this mean we can just keep increasing the memory and reap the benefits? Sadly no, there's a tipping point where increasing the memory wont do much anymore.
+Great, it's even faster now! Does this mean we can just keep increasing the memory and reap the benefits? Sadly no--there's a tipping point where increasing the memory wont make it run faster.
 
-For example, increasing the memory to `3008 MB` (the <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html" target="_blank" rel="noopener noreferrer">memory limit</a> at the time of this writing) will result in almost the same duration:
+For example, increasing the memory to `3008 MB` (the maximum <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html" target="_blank" rel="noopener noreferrer">memory limit</a> at the time of this writing) will result in almost the same runtime duration:
 
 ##### 2048 MB
 
