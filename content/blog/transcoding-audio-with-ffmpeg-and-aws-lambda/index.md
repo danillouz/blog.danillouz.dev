@@ -16,6 +16,7 @@ If you want to see the code for the audio transcoder, go to <a href="https://git
 - [What does transcoding even mean?](#what-does-transcoding-even-mean)
 - [Transcoding audio](#transcoding-audio)
 - [Using Amazon Elastic Transcoder](#using-amazon-elastic-transcoder)
+- [Using FFmpeg + AWS Lambda Layers](#using-ffmpeg--aws-lambda-layers).
 - [In closing](#in-closing)
 
 ## Use case
@@ -518,7 +519,7 @@ You should see a job, select it for more information.
 
 If it has status "Complete", there should be a file named `test.mp3` in the output bucket!
 
-### Using FFmpeg + AWS Lambda Layers
+## Using FFmpeg + AWS Lambda Layers
 
 FFmpeg is a cross-platform solution that can be used to convert audio and video files. And since it's a binary, we'll use a Lambda Layer to execute it from our Lambda function.
 
@@ -531,14 +532,14 @@ Because we're still converting a WebM audio file to MP3 whenever a file is uploa
 
 We'll have to go through the following steps to make this happen:
 
-1. [Create and publish the FFmpeg Lambda Layer.](#1-create-and-publish-the-ffmpeg-lambda-layer)
-2. [Update the Serverless manifest.](#2-update-the-serverless-manifest)
-3. [Update the Lambda function.](#3-update-the-lambda-function)
-4. [Release the updated Lambda function.](#4-release-the-updated-lambda-function)
-5. [Trigger another transcoder job.](#5-trigger-another-transcoder-job)
+1. [Create and publish the FFmpeg Lambda Layer](#1-create-and-publish-the-ffmpeg-lambda-layer)
+2. [Update the Serverless manifest](#2-update-the-serverless-manifest)
+3. [Update the Lambda function](#3-update-the-lambda-function)
+4. [Release the updated Lambda function](#4-release-the-updated-lambda-function)
+5. [Trigger another transcoder job](#5-trigger-another-transcoder-job)
 6. [Optimizing the Lambda function](#6-optimizing-the-lambda-function)
 
-#### 1. Create and publish the FFmpeg Lambda Layer
+### 1. Create and publish the FFmpeg Lambda Layer
 
 Lambda Layers allow us to "pull in" extra dependencies into our Lambda functions. A layer is basically a ZIP archive that contains some code. And in order to use a layer, we first must create and publish one.
 
@@ -646,7 +647,7 @@ When Serverless finishes deploying, navigate to the "Lambda" service in the AWS 
   <figcaption>Information about the published FFmpeg layer.</figcaption>
 </figure>
 
-#### 2. Update the Serverless manifest
+### 2. Update the Serverless manifest
 
 > Note that we're now modifying the manifest file of the "audio-transcoder".
 
@@ -774,7 +775,7 @@ functions:
     # highlight-end
 ```
 
-#### 3. Update the Lambda function
+### 3. Update the Lambda function
 
 Since we have to read from the input bucket, and write to the output bucket, replace the Elastic Transcoder client with the S3 client:
 
@@ -1031,7 +1032,7 @@ module.exports.transcodeToMp3 = async event => {
 };
 ```
 
-#### 4. Release the updated Lambda function
+### 4. Release the updated Lambda function
 
 Run the same command like before from the project root:
 
@@ -1039,7 +1040,7 @@ Run the same command like before from the project root:
 sls deploy --region eu-west-1 --stage prod
 ```
 
-#### 5. Trigger another transcoder job
+### 5. Trigger another transcoder job
 
 When Serverless is done deploying, upload a WebM file to the input bucket. But why does the output bucket remain empty? Where's the MP3 file?
 
@@ -1064,7 +1065,7 @@ What's happening? Our Lambda function takes "too long" to finish executing. By d
 
 In other words, because of the default timeout, after 6 seconds our Lambda is still not done transcoding and AWS _terminates_ it. Therefore we must optimize our Lambda function!
 
-#### 6. Optimizing the Lambda function
+### 6. Optimizing the Lambda function
 
 First lets just set the timeout to a larger value (for example 3 minutes) so we can see how long it would actually take to complete the transcoding process:
 
@@ -1118,7 +1119,7 @@ Deploy again, and when Serverless is done, upload another WebM file, and check t
 
 This time we see FFmpeg completed the transcoding process, and that the Lambda had a duration of `7221.95 ms`. If we check the output bucket now, we'll see the MP3 file!
 
-##### Optimizing further
+#### Optimizing further
 
 This isn't bad, but we can do better! Something that's very important when working with Lambda, is to _always_ performance test your functions--always make sure that a Lambda function has the _optimum_ memory size configured.
 
