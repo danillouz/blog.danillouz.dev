@@ -14,7 +14,6 @@ If you want to see the code for the audio transcoder, go to <a href="https://git
 
 - [Use case](#use-case)
 - [What does transcoding even mean?](#what-does-transcoding-even-mean)
-- [Transcoding audio](#transcoding-audio)
 - [Using Amazon Elastic Transcoder](#using-amazon-elastic-transcoder)
 - [Using FFmpeg + AWS Lambda Layers](#using-ffmpeg--aws-lambda-layers).
 - [In closing](#in-closing)
@@ -76,29 +75,31 @@ MediaRecorder.isTypeSupported('audio/webm;codecs=opus'); // true
 
 So if we want to end up with MP3 files of the recordings, we need to transcode (and technically also transmux) the WebM audio files.
 
-## Transcoding audio
+### How will we do this?
 
 We'll explore two implementations that both transform a WebM audio file into MP3:
 
 - [Using Amazon Elastic Transcoder](#using-amazon-elastic-transcoder).
 - [Using FFmpeg + AWS Lambda Layers](#using-ffmpeg--aws-lambda-layers).
 
-For both implementations we'll use the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>, and <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> to write the code for our <a href="https://aws.amazon.com/lambda/" target="_blank" rel="noopener noreferrer">Lambda</a> functions.
+For both implementations we'll use the <a href="https://serverless.com/" target="_blank" rel="noopener noreferrer">Serverless Framework</a>, and <a href="https://nodejs.org/en/" target="_blank" rel="noopener noreferrer">Node.js</a> to write the code for our <a href="https://aws.amazon.com/lambda/" target="_blank" rel="noopener noreferrer">Lambda</a> function.
 
-Make sure you have Node.js installed, and then use <a href="https://www.npmjs.com/" target="_blank" rel="noopener noreferrer">npm</a> to install the Serverless Framework globally:
+Before we get started, make sure you have Node.js installed, and then use <a href="https://www.npmjs.com/" target="_blank" rel="noopener noreferrer">npm</a> to install the Serverless Framework globally:
 
 ```shell
 npm i -G serverless
 ```
 
-Additionally, we'll need two <a href="https://aws.amazon.com/s3/" target="_blank" rel="noopener noreferrer">S3</a> buckets to store audio files:
+Additionally, we'll need two <a href="https://aws.amazon.com/s3/" target="_blank" rel="noopener noreferrer">S3</a> buckets to process our audio files:
 
-- An _input_ bucket for the "raw" WebM recordings.
-- An _output_ bucket for the transcoded MP3 recordings.
+- An _input_ bucket to upload WebM recordings.
+- An _output_ bucket to store transcoded MP3 recordings.
 
 ## Using Amazon Elastic Transcoder
 
-This is a fully managed and highly scalable AWS service, and we'll have to go through the following steps to get it up and running:
+This is a fully managed and highly scalable AWS service that can be used to transcode audio and video files.
+
+We'll go through the following steps to get it up and running:
 
 1. [Create a pipeline](#1-create-a-pipeline)
 2. [Choose a preset](#2-choose-a-preset)
@@ -523,14 +524,24 @@ If it has status "Complete", there should be a file named `test.mp3` in the outp
 
 FFmpeg is a cross-platform solution that can be used to convert audio and video files. And since it's a binary, we'll use a Lambda Layer to execute it from our Lambda function.
 
-Because we're still converting a WebM audio file to MP3 whenever a file is uploaded to our input bucket, we can reuse our `audio-transcoder` project by making a few changes:
+### What's a Lambda Layer?
+
+Lambda Layers allow us to "pull in" extra dependencies into our Lambda functions. A layer is basically a ZIP archive that contains some code. And in order to use a layer, we first must create and publish one.
+
+After we publish a layer, we can configure any Lambda function to use it. AWS will then extract the layer to a special directory called `/opt`, and the Lambda function runtime will be able to execute it.
+
+> "Note that a Lambda function can use up to 5 layers at a time."--from <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html" target="_blank" rel="noopener noreferrer">Lambda Layers docs</a>
+
+### How different is this implementation?
+
+Because we're still converting a WebM audio file to MP3 whenever a file is uploaded to our input bucket, we can reuse our "audio-transcoder" project by making a few changes:
 
 - Replace Amazon Elastic Transcoder with FFmpeg.
 - Retrieve the WebM audio file from the input bucket, whenever a file is uploaded.
 - Convert the retrieved WebM file to MP3 using FFmpeg.
 - Write the converted MP3 file to the output bucket.
 
-We'll have to go through the following steps to make this happen:
+And we'll apply these changes by going through the following steps:
 
 1. [Create and publish the FFmpeg Lambda Layer](#1-create-and-publish-the-ffmpeg-lambda-layer)
 2. [Update the Serverless manifest](#2-update-the-serverless-manifest)
@@ -540,12 +551,6 @@ We'll have to go through the following steps to make this happen:
 6. [Optimizing the Lambda function](#6-optimizing-the-lambda-function)
 
 ### 1. Create and publish the FFmpeg Lambda Layer
-
-Lambda Layers allow us to "pull in" extra dependencies into our Lambda functions. A layer is basically a ZIP archive that contains some code. And in order to use a layer, we first must create and publish one.
-
-After we publish a layer, we can configure any Lambda function to use it. AWS will then extract the layer to a special directory called `/opt`, and the Lambda function runtime will be able to execute it.
-
-> "Note that a Lambda function can use up to 5 layers at a time."--from <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html" target="_blank" rel="noopener noreferrer">Lambda Layers docs</a>
 
 The Serverless Framework makes it very easy to work with layers. To get started, create a new project named "lambda-layers":
 
@@ -1182,7 +1187,7 @@ Great, it's even faster now! Does this mean we can just keep increasing the memo
 
 For example, increasing the memory to `3008 MB` (the maximum <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html" target="_blank" rel="noopener noreferrer">memory limit</a> at the time of this writing) will result in almost the same runtime duration:
 
-##### 2048 MB
+##### Lambda memory: 2048 MB
 
 | Execution run | Duration     | Billed Duration | Cold Start Duration |
 | ------------- | ------------ | --------------- | ------------------- |
@@ -1192,7 +1197,7 @@ For example, increasing the memory to `3008 MB` (the maximum <a href="https://do
 | 4             | `3677.14 ms` | `3700 ms`       | -                   |
 | 5             | `3725.77 ms` | `3800 ms`       | -                   |
 
-##### 3008 MB
+##### Lambda memory: 3008 MB
 
 | Execution run | Duration     | Billed Duration | Cold Start Duration |
 | ------------- | ------------ | --------------- | ------------------- |
