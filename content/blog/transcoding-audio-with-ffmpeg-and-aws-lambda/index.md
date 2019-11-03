@@ -535,6 +535,7 @@ We'll have to go through the following steps to get this up and running:
 3. [Update the Lambda function.](#3-update-the-lambda-function)
 4. [Release the updated Lambda function.](#4-release-the-updated-lambda-function)
 5. [Trigger another transcoder job.](#5-trigger-another-transcoder-job)
+6. [Optimizing the Lambda function](#6-optimizing-the-lambda-function)
 
 #### 1. Create and publish the FFmpeg Lambda Layer
 
@@ -1034,7 +1035,166 @@ sls deploy --region eu-west-1 --stage prod
 
 #### 5. Trigger another transcoder job
 
-Upload another WebM file to the input bucket.
+When we now upload a WebM file to the input bucket, the output bucket stays empty..
+
+Lets find out why this is the case by checking the Lambda function's log files in the AWS web console:
+
+- Go to the "Lambda" service.
+- Click on your function.
+- Click on the "Monitoring" tab.
+- Click the "View logs in CloudWatch" button.
+- Select the latest log group.
+
+Here you should the logs of your Lambda function:
+
+<figure>
+  <img src="./img/logs-timeout.png" alt="CloudWatch logs of the Lambda function that's timing out.">
+  <figcaption>The Lambda function stops executing after about 6 seconds.</figcaption>
+</figure>
+
+The logs tell us that FFmpeg is running, but that it doesn't complete! In the middle of the transcoding process the logs just say "END", and on the final line we see that the Lambda had a duration of `6006.17 ms`.
+
+What's happening is that our Lambda function takes "too long" to complete executing. By default the Lambda has a timeout of 6 seconds, which we can increase--at the time of this writing the maximum timeout can be set to <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html" target="_blank" rel="noopener noreferrer">900 seconds</a>.
+
+So after 6 seconds our Lambda is still not done transcoding and AWS _terminates_ it. Therefore we must optimize our Lambda function!
+
+#### 6. Optimizing the Lambda function
+
+First lets just set the timout to a larger value, for example 3 minutes, so we can see how long it would actually take to complete the transcoding process:
+
+```yml
+service: audio-transcoder
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  environment:
+    S3_INPUT_BUCKET_NAME: 'raw.recordings'
+    S3_OUTPUT_BUCKET_NAME: 'transcoded.recordings'
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+      Resource: arn:aws:s3:::raw.recordings/*
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+      Resource: arn:aws:s3:::transcoded.recordings/*
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+
+functions:
+  transcodeToMp3:
+    handler: src/handler.transcodeToMp3
+    description: Transcode an audio file to MP3
+    timeout: 180 # highlight-line
+    events:
+      - s3:
+          bucket: 'raw.recordings'
+          event: 's3:ObjectCreated:*'
+          existing: true
+    layers:
+      - YOUR_FFMPEG_LAYER_ARN
+```
+
+And deploy again:
+
+```shell
+sls deploy --region eu-west-1 --stage prod
+```
+
+When Serverless is done, upload another WebM file and check the logs again:
+
+<figure>
+  <img src="./img/logs-complete.png" alt="CloudWatch logs of the Lambda function that completes executing.">
+  <figcaption>The Lambda function completes executing after about 7 seconds.</figcaption>
+</figure>
+
+This time we see FFmpeg completed the transcoding process, and that our Lambda had a duration of `7221.95 ms`. If we check the output bucket now, we see our transcoded MP3 file!
+
+But we can do better--something that's very important when using Lambda, is to _always_ performance test your function. You should always make sure that your Lambda function has the _optimum_ memory size congifured.<br/>
+When you choose a higher memory setting, AWS will also give you an equivalent CPU boost, which usually impacts the runtime duration! And in general, the function's memory + duration are the main factors that will affect your costs.
+
+By default our Lambda function has a memory setting of `1024 MB`, so lets double it and compare results:
+
+```yml
+service: audio-transcoder
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  environment:
+    S3_INPUT_BUCKET_NAME: 'raw.recordings'
+    S3_OUTPUT_BUCKET_NAME: 'transcoded.recordings'
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+      Resource: arn:aws:s3:::raw.recordings/*
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+      Resource: arn:aws:s3:::transcoded.recordings/*
+
+package:
+  exclude:
+    - ./*
+    - ./**/*.test.js
+  include:
+    - node_modules
+    - src
+
+functions:
+  transcodeToMp3:
+    handler: src/handler.transcodeToMp3
+    description: Transcode an audio file to MP3
+    timeout: 180
+    memorySize: 2048 # highlight-line
+    events:
+      - s3:
+          bucket: 'raw.recordings'
+          event: 's3:ObjectCreated:*'
+          existing: true
+    layers:
+      - YOUR_FFMPEG_LAYER_ARN
+```
+
+Deploy again, and when Serverless is done, upload another WebM file and check the logs again:
+
+<figure>
+  <img src="./img/logs-double-memory.png" alt="CloudWatch logs of the Lambda function with twice the memory.">
+  <figcaption>The Lambda function with 2048 MB of memory completes in about 4 seconds.</figcaption>
+</figure>
+
+Great, its even faster now! Does this mean we can just keep increasing the memory and reap the benefits? Sadly no, there's a tipping point where increasing the memory wont do much anymore.
+
+For example, increasing the memory to `3008 MB` (the <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html" target="_blank" rel="noopener noreferrer">memory limit</a> at the time of this writing) will result in almost the same duration:
+
+##### 2048 MB
+
+| Execution run | Duration     | Billed Duration | Cold Start Duration |
+| ------------- | ------------ | --------------- | ------------------- |
+| 1             | `3775.63 ms` | `3800 ms`       | `392.59 ms`         |
+| 2             | `3604.71 ms` | `3700 ms`       | -                   |
+| 3             | `3682.62 ms` | `3700 ms`       | -                   |
+| 4             | `3677.14 ms` | `3700 ms`       | -                   |
+| 5             | `3725.77 ms` | `3800 ms`       | -                   |
+
+##### 3008 MB
+
+| Execution run | Duration     | Billed Duration | Cold Start Duration |
+| ------------- | ------------ | --------------- | ------------------- |
+| 1             | `4125.12 ms` | `4200 ms`       | `407.92 ms`         |
+| 2             | `3767.79 ms` | `3800 ms`       | -                   |
+| 3             | `3736.06 ms` | `3800 ms`       | -                   |
+| 4             | `3662.68 ms` | `3700 ms`       | -                   |
+| 5             | `3717.01 ms` | `3800 ms`       | -                   |
 
 ## In closing
 
