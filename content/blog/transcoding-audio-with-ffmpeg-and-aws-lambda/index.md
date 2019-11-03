@@ -109,7 +109,7 @@ This is a fully managed and highly scalable AWS service, and we'll have to go th
 
 ### 1. Create a pipeline
 
-In the AWS web console, navigate to the "Elastic Transcoder" service. Select a region (for example Ireland), and click "Create New Pipeline".
+Navigate to the "Elastic Transcoder" service in the AWS web console. Select a region (for example Ireland), and click "Create New Pipeline".
 
 <figure>
   <img src="./img/create-pipeline.png" alt="Image of the Elastic Transcoder create pipeline form.">
@@ -129,7 +129,7 @@ Create the pipeline and take note of the "ARN" and "Pipeline ID". We'll need bot
 
 The pipeline we created in the previous step requires a <a href="https://docs.aws.amazon.com/elastictranscoder/latest/developerguide/working-with-presets.html" target="_blank" rel="noopener noreferrer">preset</a> to work. Presets contain settings we want to be applied during the transcoding process. And lucky for us, AWS already has system presets to create MP3 files.
 
-In the web console, click on "Presets" and filter on keyword "MP3". Select one and take note of the "ARN" and "Preset ID". We'll also need these to configure our Lambda function later on.
+In the web console, click on "Presets" and filter on the keyword "MP3". Select a preset and take note of its "ARN" and "Preset ID". We'll also need these to configure our Lambda function later on.
 
 <figure>
   <img src="./img/preset.png" alt="Image of the Elastic Transcoder MP3 preset.">
@@ -138,9 +138,9 @@ In the web console, click on "Presets" and filter on keyword "MP3". Select one a
 
 ### 3. Create an IAM Policy
 
-AWS will already have created am IAM Role for you, named `Elastic_Transcoder_Default_Role`. But in order for the pipeline to _read_ the objects in our input bucket, and _write_ objects to our output bucket, we need to make sure the role has the required permissions to do so.
+AWS will already have created am IAM Role named `Elastic_Transcoder_Default_Role`. But in order for the pipeline to _read_ the objects from the input bucket, and _write_ objects to the output bucket, we need to make sure the role has the required permissions to do so.
 
-We'll have to create a new _IAM Policy_ with the following configuration:
+Create a new _IAM Policy_ with the following configuration:
 
 ```json
 {
@@ -180,7 +180,7 @@ Create a new project named "audio-transcoder":
 mkdir audio-transcoder
 ```
 
-Move into this directory and create a `serverless.yml` file in your project root:
+Move into this directory and create a `serverless.yml` file in the project root:
 
 ```shell
 audio-transcoder
@@ -205,7 +205,7 @@ package:
     - src
 ```
 
-We'll add the Elastic Transcoder Pipeline ID, MP3 Preset ID and region (from [step 1](#1-create-a-pipeline) and [step 2](#2-choose-a-preset)) as environment variables:
+Add the Elastic Transcoder Pipeline ID, MP3 Preset ID and region (from [step 1](#1-create-a-pipeline) and [step 2](#2-choose-a-preset)) as environment variables:
 
 ```yml
 service: audio-transcoder
@@ -229,7 +229,7 @@ package:
     - src
 ```
 
-We'll also use the Elastic Transcoder Pipeline ARN and MP3 Preset ARN (from [step 1](#1-create-a-pipeline) and [step 2](#2-choose-a-preset)) to configure our Lambda with the required IAM permissions, so it can create transcoder jobs:
+Use the Elastic Transcoder Pipeline ARN and MP3 Preset ARN (from [step 1](#1-create-a-pipeline) and [step 2](#2-choose-a-preset)) to configure the Lambda with the required IAM permissions, so it can create transcoder jobs:
 
 ```yml
 service: audio-transcoder
@@ -260,7 +260,7 @@ package:
     - src
 ```
 
-Finally, we add the Lambda function definition--this Lambda will be executed whenever an object is created in our input bucket:
+Finally, add the Lambda function definition--this Lambda will be executed whenever an object is created in the input bucket:
 
 ```yml
 service: audio-transcoder
@@ -301,7 +301,7 @@ functions:
 # highlight-end
 ```
 
-This is the minimal configuration you need to get started. But if you'd like to learn more, I recommend you read the <a href="https://serverless.com/framework/docs/providers/aws/guide/serverless.yml/" target="_blank" rel="noopener noreferrer">Serverless manifest</a> and <a href="https://serverless.com/framework/docs/providers/aws/events/s3/" target="_blank" rel="noopener noreferrer">S3 event configuration</a> docs.
+This is the minimal configuration needed to get started. But if you'd like to learn more, I recommend you read the <a href="https://serverless.com/framework/docs/providers/aws/guide/serverless.yml/" target="_blank" rel="noopener noreferrer">Serverless manifest</a> and <a href="https://serverless.com/framework/docs/providers/aws/events/s3/" target="_blank" rel="noopener noreferrer">S3 event configuration</a> docs.
 
 ### 5. Implement the Lambda function
 
@@ -345,7 +345,7 @@ In the previous step, we configured our Lambda to be executed whenever an object
 ```
 
 The `s3` object will contain a property called `key`, which is the "name" of the file that was created in the input bucket.<br/>
-For example, if we upload a file named `test.wemb` to the S3 bucket, the value of `key` will be the (URL encoded) string `test.webm`.<br />
+For example, if we upload a file named `test.wemb` to the S3 bucket, the value of `key` will be the (URL encoded!) string `test.webm`.<br />
 You can see the entire event message structure in the <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/notification-content-structure.html" target="_blank" rel="noopener noreferrer">AWS S3 docs</a>.
 
 Also be aware that you can get **more than one** `Record`--always process all of them:
@@ -428,7 +428,7 @@ module.exports.transcodeToMp3 = async event => {
 };
 ```
 
-And schedule a transcoder job for every created S3 object in our input bucket:
+And schedule a transcoder job for every created S3 object in the input bucket:
 
 ```js
 'use strict';
@@ -496,14 +496,14 @@ sls deploy --region eu-west-1 --stage prod
 
 ### 7. Trigger a transcoder job
 
-With everything up and running, we can now upload a WebM audio file to our input bucket. In the AWS web console, navigate to the "S3" service:
+With everything up and running, we can now upload a WebM audio file to the input bucket. Navigate to the "S3" service in AWS web console:
 
 - Select your input bucket.
 - Click "Upload".
 - Add a WebM file.
 - Click on "Upload" again.
 
-> If you don't have a WebM file, but would like to try this out, you can use my <a href="./audio/test.webm" download>test.webm</a> file--it's a 3 min. recording of a podcast I was listening to.
+> If you don't have a WebM file, but would like to try this out, you can use my <a href="./audio/test.webm" download>test.webm</a> file--it's a 3 minute (2,9 MB) recording of a podcast I was listening to.
 
 This action will trigger an `s3:ObjectCreated` event and AWS will execute the Lambda function we deployed in the previous step, which will schedule a transcoder job.
 
@@ -516,7 +516,7 @@ You should see a job, select it for more information.
   <figcaption>Information about the created pipeline job.</figcaption>
 </figure>
 
-If it has status "Complete", we should have a `test.mp3` file in our output bucket!
+If it has status "Complete", there should be a file named `test.mp3` in the output bucket!
 
 ### Using FFmpeg + AWS Lambda Layers
 
