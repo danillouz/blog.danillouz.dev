@@ -586,7 +586,7 @@ The layer is named `ffmpeg` and the `path` propery dictates that the layer code 
 mkdir layers
 ```
 
-Move into this directory and download a static build of FFmpeg from <a href="https://johnvansickle.com/ffmpeg/">johnvansickle.com/ffmpeg</a>. These builds are compatible with Amazon Linux 2--the operating system on which Lambda runs when the `Node.js 10.x` runtime is used. Specifically, use the `ffmpeg-git-amd64-static.tar.xz` master build:
+Move into this directory and download a static build of FFmpeg from <a href="https://johnvansickle.com/ffmpeg/" target="_blank" rel="noopener noreferrer">johnvansickle.com/ffmpeg</a>. These builds are compatible with Amazon Linux 2--the operating system on which Lambda runs when the `Node.js 10.x` runtime is used. Specifically, use the `ffmpeg-git-amd64-static.tar.xz` master build:
 
 ```shell
 curl -O https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
@@ -769,9 +769,272 @@ functions:
 
 #### 3. Update the Lambda function
 
+Since we have to read from our input bucket, and write to our output bucket, we replace the Elastic Transcoder client with the S3 client:
+
+```js
+'use strict';
+
+// highlight-start
+const S3 = require('aws-sdk/clients/s3');
+const { S3_INPUT_BUCKET_NAME, S3_OUTPUT_BUCKET_NAME } = process.env;
+const s3Client = new S3();
+// highlight-end
+
+module.exports.transcodeToMp3 = async event => {
+  try {
+    for (const Record of event.Records) {
+      const { s3 } = Record;
+      if (!s3) {
+        continue;
+      }
+      const { object: s3Object = {} } = s3;
+      const { key } = s3Object;
+      if (!key) {
+        continue;
+      }
+      // Keys are sent as URI encoded strings
+      // If keys are not decoded, they will not be found in their buckets
+      const decodedKey = decodeURIComponent(key);
+
+      await transcoderClient
+        .createJob({
+          PipelineId: TRANSCODE_AUDIO_PIPELINE_ID,
+          Input: {
+            Key: decodedKey
+          },
+          Outputs: [
+            {
+              Key: decodedKey.replace('webm', 'mp3'),
+              PresetId: TRANSCODER_MP3_PRESET_ID
+            }
+          ]
+        })
+        .promise();
+    }
+  } catch (err) {
+    console.log('Transcoder Error: ', err);
+  }
+};
+```
+
+Then we use the `decodedKey` to get the WebM recording from our input bucket:
+
+```js
+'use strict';
+
+const S3 = require('aws-sdk/clients/s3');
+const { S3_INPUT_BUCKET_NAME, S3_OUTPUT_BUCKET_NAME } = process.env;
+const s3Client = new S3();
+
+module.exports.transcodeToMp3 = async event => {
+  try {
+    for (const Record of event.Records) {
+      const { s3 } = Record;
+      if (!s3) {
+        continue;
+      }
+      const { object: s3Object = {} } = s3;
+      const { key } = s3Object;
+      if (!key) {
+        continue;
+      }
+      // Keys are sent as URI encoded strings
+      // If keys are not decoded, they will not be found in their buckets
+      const decodedKey = decodeURIComponent(key);
+
+      // highlight-start
+      const webmRecording = await s3Client
+        .getObject({
+          Bucket: S3_INPUT_BUCKET_NAME,
+          Key: decodedKey
+        })
+        .promise();
+      // highlight-end
+    }
+  } catch (err) {
+    console.log('Transcoder Error: ', err);
+  }
+};
+```
+
+The S3 client returns an object that contains a `Body` property. The value of `Body` is a blob, which we'll feed to the ffmpeg layer and convert to an MP3. We'll create a small helper module called `ffmpeg` to do this. In `src` create a file named `ffmpeg.js`:
+
+```shell
+audio-transcoder
+  ├── serverless.yml
+  └── src
+      ├── ffmpeg.js # highlight-line
+      └── handler.js
+```
+
+And export an object with a method called `convertWebmToMp3` which receives the WebM blob as a parameter:
+
+```js
+'use strict';
+
+module.exports = {
+  convertWebmToMp3(webmBlob) {
+    // Implementation goes here
+  }
+};
+```
+
+This module will spawn a <a href="https://nodejs.org/api/child_process.html#child_process_child_process_spawnsync_command_args_options" target="_blank" rel="noopener noreferrer">synchronous child process</a> that allows us to execute the `ffmpeg` "command" (provided by our ffmpeg layer):
+
+```js
+'use strict';
+
+const { spawnSync } = require('child_process'); // highlight-line
+
+module.exports = {
+  convertWebmToMp3(webmBlob) {
+    // highlight-start
+    spawnSync(
+      '/opt/ffmpeg/ffmpeg', // "/opt/:LAYER_NAME/:BINARY_NAME"
+      [
+        /* ffmpeg command arguments go here */
+      ],
+      { stdio: 'inherit' }
+    );
+    // highlight-end
+  }
+};
+```
+
+The ffmpeg command requires the file system to do its magic. And we'll use a special directory called `/tmp` for this.
+
+> The `/tmp` directory allows you to **temporarily** store up to <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html" target="_blank" rel="noopener noreferrer">512 MB</a>.
+
+First we write the WebM blob to `/tmp` so ffmpeg can read it, and then we tell ffmpeg to write the produced MP3 file to the same directory:
+
+```js
+'use strict';
+
+const { spawnSync } = require('child_process');
+const { writeFileSync } = require('fs'); // highlight-line
+
+module.exports = {
+  convertWebmToMp3(webmBlob) {
+    // highlight-start
+    const now = Date.now();
+    const input = `/tmp/${now}.webm`;
+    const output = `/tmp/${now}.mp3`;
+    // highlight-end
+
+    // highlight-start
+    writeFileSync(input, webmBlob);
+    // highlight-end
+
+    // highlight-start
+    spawnSync('/opt/ffmpeg/ffmpeg', ['-i', input, output], {
+      stdio: 'inherit'
+    });
+    // highlight-end
+  }
+};
+```
+
+Now we can read the produced MP3 file from disk, clean `/tmp`, and return the MP3 blob:
+
+```js
+'use strict';
+
+const { spawnSync } = require('child_process');
+const { readFileSync, writeFileSync, unlinkSync } = require('fs'); // highlight-line
+
+module.exports = {
+  convertWebmToMp3(webmBlob) {
+    const now = Date.now();
+    const input = `/tmp/${now}.webm`;
+    const output = `/tmp/${now}.mp3`;
+
+    writeFileSync(input, webmBlob);
+
+    // highlight-start
+    spawnSync('/opt/ffmpeg/ffmpeg', ['-i', input, output], {
+      stdio: 'inherit'
+    });
+    // highlight-end
+
+    // highlight-start
+    const mp3Blob = readFileSync(output);
+    // highlight-end
+
+    // highlight-start
+    // Clean all temporary files
+    unlinkSync(input);
+    unlinkSync(output);
+    // highlight-end
+
+    // highlight-start
+    return mp3Blob;
+    // highlight-end
+  }
+};
+```
+
+And use the MP3 blob to write it to our output bucket:
+
+```js
+'use strict';
+
+const S3 = require('aws-sdk/clients/s3');
+const ffmpeg = require('./ffmpeg'); // highlight-line
+const { S3_INPUT_BUCKET_NAME, S3_OUTPUT_BUCKET_NAME } = process.env;
+const s3Client = new S3();
+
+module.exports.transcodeToMp3 = async event => {
+  try {
+    for (const Record of event.Records) {
+      const { s3 } = Record;
+      if (!s3) {
+        continue;
+      }
+      const { object: s3Object = {} } = s3;
+      const { key } = s3Object;
+      if (!key) {
+        continue;
+      }
+      // Keys are sent as URI encoded strings
+      // If keys are not decoded, they will not be found in their buckets
+      const decodedKey = decodeURIComponent(key);
+
+      const webmRecording = await s3Client
+        .getObject({
+          Bucket: S3_INPUT_BUCKET_NAME,
+          Key: decodedKey
+        })
+        .promise();
+
+      // highlight-start
+      const mp3Blob = ffmpeg.convertWebmToMp3(webmRecording.Body);
+      await s3Client
+        .putObject({
+          Bucket: S3_OUTPUT_BUCKET_NAME,
+          Key: decodedKey.replace('webm', 'mp3'),
+          ContentType: 'audio/mpeg',
+          Body: mp3Blob
+        })
+        .promise();
+      // highlight-end
+    }
+  } catch (err) {
+    console.log('Transcoder Error: ', err);
+  }
+};
+```
+
 #### 4. Release the updated Lambda function
 
+Run the same command like before from the project root:
+
+```shell
+sls deploy --region eu-west-1 --stage prod
+```
+
 #### 5. Trigger another transcoder job
+
+Upload another WebM file to the input bucket.
 
 ## In closing
 
