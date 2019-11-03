@@ -15,6 +15,7 @@ If you want to see the code for the audio transcoder, go to <a href="https://git
 - [Use case](#use-case)
 - [What does transcoding even mean?](#what-does-transcoding-even-mean)
 - [Transcoding audio](#transcoding-audio)
+- [Using Amazon Elastic Transcoder](#using-amazon-elastic-transcoder)
 - [In closing](#in-closing)
 
 ## Use case
@@ -94,19 +95,19 @@ Additionally, we'll need two <a href="https://aws.amazon.com/s3/" target="_blank
 - An _input_ bucket for the "raw" WebM recordings.
 - An _output_ bucket for the transcoded MP3 recordings.
 
-### Using Amazon Elastic Transcoder
+## Using Amazon Elastic Transcoder
 
 This is a fully managed and highly scalable AWS service, and we'll have to go through the following steps to get it up and running:
 
-1. [Create a pipeline.](#1-create-a-pipeline)
-2. [Choose a preset.](#2-choose-a-preset)
-3. [Create an IAM Policy.](#3-create-an-iam-policy)
-4. [Create a Serverless project.](#4-create-a-serverless-project)
-5. [Implement the Lambda function.](#5-implement-the-lambda-function)
-6. [Release the Lambda function.](#6-release-the-lambda-function)
-7. [Trigger a transcoder job.](#7-trigger-a-transcoder-job)
+1. [Create a pipeline](#1-create-a-pipeline)
+2. [Choose a preset](#2-choose-a-preset)
+3. [Create an IAM Policy](#3-create-an-iam-policy)
+4. [Create a Serverless project](#4-create-a-serverless-project)
+5. [Implement the Lambda function](#5-implement-the-lambda-function)
+6. [Release the Lambda function](#6-release-the-lambda-function)
+7. [Trigger a transcoder job](#7-trigger-a-transcoder-job)
 
-#### 1. Create a pipeline
+### 1. Create a pipeline
 
 In the AWS web console, navigate to the "Elastic Transcoder" service. Select a region (for example Ireland), and click "Create New Pipeline".
 
@@ -124,7 +125,7 @@ Create the pipeline and take note of the "ARN" and "Pipeline ID". We'll need bot
   <figcaption>The created pipeline with its ID and ARN.</figcaption>
 </figure>
 
-#### 2. Choose a preset
+### 2. Choose a preset
 
 The pipeline we created in the previous step requires a <a href="https://docs.aws.amazon.com/elastictranscoder/latest/developerguide/working-with-presets.html" target="_blank" rel="noopener noreferrer">preset</a> to work. Presets contain settings we want to be applied during the transcoding process. And lucky for us, AWS already has system presets to create MP3 files.
 
@@ -135,7 +136,7 @@ In the web console, click on "Presets" and filter on keyword "MP3". Select one a
   <figcaption>AWS system preset for MP3 (128k) files.</figcaption>
 </figure>
 
-#### 3. Create an IAM Policy
+### 3. Create an IAM Policy
 
 AWS will already have created am IAM Role for you, named `Elastic_Transcoder_Default_Role`. But in order for the pipeline to _read_ the objects in our input bucket, and _write_ objects to our output bucket, we need to make sure the role has the required permissions to do so.
 
@@ -171,7 +172,7 @@ We'll have to create a new _IAM Policy_ with the following configuration:
 
 After the Policy has been created, attach it to `Elastic_Transcoder_Default_Role`.
 
-#### 4. Create a Serverless project
+### 4. Create a Serverless project
 
 Create a new project named "audio-transcoder":
 
@@ -302,7 +303,7 @@ functions:
 
 This is the minimal configuration you need to get started. But if you'd like to learn more, I recommend you read the <a href="https://serverless.com/framework/docs/providers/aws/guide/serverless.yml/" target="_blank" rel="noopener noreferrer">Serverless manifest</a> and <a href="https://serverless.com/framework/docs/providers/aws/events/s3/" target="_blank" rel="noopener noreferrer">S3 event configuration</a> docs.
 
-#### 5. Implement the Lambda function
+### 5. Implement the Lambda function
 
 In order to match the Lambda function definition in the Serverless manifest, create a file named `handler.js` in `src`:
 
@@ -485,7 +486,7 @@ module.exports.transcodeToMp3 = async event => {
 
 You can read more about the `createJob` API in the <a href="https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/ElasticTranscoder.html#createJob-property" target="_blank" rel="noopener noreferrer">AWS JavaScript SDK</a> docs.
 
-#### 6. Release the Lambda function
+### 6. Release the Lambda function
 
 In order to upload the Lambda to AWS, make sure you have your <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html" target="_blank" rel="noopener noreferrer">credentials configured</a>, and then run the following command from the project root:
 
@@ -493,7 +494,7 @@ In order to upload the Lambda to AWS, make sure you have your <a href="https://d
 sls deploy --region eu-west-1 --stage prod
 ```
 
-#### 7. Trigger a transcoder job
+### 7. Trigger a transcoder job
 
 With everything up and running, we can now upload a WebM audio file to our input bucket. In the AWS web console, navigate to the "S3" service:
 
