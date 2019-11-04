@@ -6,7 +6,7 @@ description: 'Exploring a scalable and cost-effective serverless audio transcodi
 
 ## TL;DR
 
-For my side project I'm transforming WebM audio files into MP3. I initially started doing this with <a href="https://aws.amazon.com/elastictranscoder/" target="_blank" rel="noopener noreferrer">Amazon Elastic Transcoder</a>, which works pretty well. But after doing the same with <a href="https://www.ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a> + <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html" target="_blank" rel="noopener noreferrer">AWS Lambda Layers</a>, my initial testing shows that this implementation is around **3653 times cheaper**--at least for _short audio files_ that have a max duration of 3 min.
+For my side project I'm converting WebM audio files to MP3--these are all short audio files with a duration of around 3 minutes. I initially started doing this with <a href="https://aws.amazon.com/elastictranscoder/" target="_blank" rel="noopener noreferrer">Amazon Elastic Transcoder</a>, which works pretty well. But after doing the same with <a href="https://www.ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a> + <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html" target="_blank" rel="noopener noreferrer">AWS Lambda Layers</a>, my initial testing shows that this implementation is around **10 times cheaper** and **2 times faster**.
 
 If you want to see the code for the audio transcoder, go to <a href="https://github.com/upstandfm/audio-transcoder" target="_blank" rel="noopener noreferrer">github.com/upstandfm/audio-transcoder</a>.
 
@@ -15,7 +15,8 @@ If you want to see the code for the audio transcoder, go to <a href="https://git
 - [Use case](#use-case)
 - [What does transcoding even mean?](#what-does-transcoding-even-mean)
 - [Using Amazon Elastic Transcoder](#using-amazon-elastic-transcoder)
-- [Using FFmpeg + AWS Lambda Layers](#using-ffmpeg--aws-lambda-layers).
+- [Using FFmpeg + AWS Lambda Layers](#using-ffmpeg--aws-lambda-layers)
+- [Comparing costs](#comparing-costs)
 - [In closing](#in-closing)
 
 ## Use case
@@ -505,7 +506,7 @@ With everything up and running, we can now upload a WebM audio file to the input
 - Add a WebM file.
 - Click on "Upload" again.
 
-> If you don't have a WebM file, but would like to try this out, you can use my <a href="./audio/test.webm" download>test.webm</a> file--it's a 3 minute (2,9 MB) recording of a podcast I was listening to.
+> If you don't have a WebM file, but would like to try this out, you can use my <a href="./audio/test.webm" download>test.webm</a> file--it's a 3 minute (2,8 MB) recording of a podcast I was listening to.
 
 This action will trigger an `s3:ObjectCreated` event and AWS will execute the Lambda function we deployed in the previous step, which will schedule a transcoder job.
 
@@ -1187,25 +1188,180 @@ Great, it's even faster now! Does this mean we can just keep increasing the memo
 
 For example, increasing the memory to `3008 MB` (the maximum <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html" target="_blank" rel="noopener noreferrer">memory limit</a> at the time of this writing) will result in almost the same runtime duration:
 
-##### Lambda memory: 2048 MB
+##### Memory size: 2048 MB
 
-| Execution run | Duration     | Billed Duration | Cold Start Duration |
-| ------------- | ------------ | --------------- | ------------------- |
-| 1             | `3775.63 ms` | `3800 ms`       | `392.59 ms`         |
-| 2             | `3604.71 ms` | `3700 ms`       | -                   |
-| 3             | `3682.62 ms` | `3700 ms`       | -                   |
-| 4             | `3677.14 ms` | `3700 ms`       | -                   |
-| 5             | `3725.77 ms` | `3800 ms`       | -                   |
+| Test run | Duration     | Billed Duration | Cold Start Duration |
+| -------- | ------------ | --------------- | ------------------- |
+| 1        | `3775,63 ms` | `3800 ms`       | `392,59 ms`         |
+| 2        | `3604,71 ms` | `3700 ms`       | -                   |
+| 3        | `3682,62 ms` | `3700 ms`       | -                   |
+| 4        | `3677,14 ms` | `3700 ms`       | -                   |
+| 5        | `3725,77 ms` | `3800 ms`       | -                   |
 
-##### Lambda memory: 3008 MB
+##### Memory size: 3008 MB
 
-| Execution run | Duration     | Billed Duration | Cold Start Duration |
-| ------------- | ------------ | --------------- | ------------------- |
-| 1             | `4125.12 ms` | `4200 ms`       | `407.92 ms`         |
-| 2             | `3767.79 ms` | `3800 ms`       | -                   |
-| 3             | `3736.06 ms` | `3800 ms`       | -                   |
-| 4             | `3662.68 ms` | `3700 ms`       | -                   |
-| 5             | `3717.01 ms` | `3800 ms`       | -                   |
+| Test run | Duration     | Billed Duration | Cold Start Duration |
+| -------- | ------------ | --------------- | ------------------- |
+| 1        | `4125,12 ms` | `4200 ms`       | `407,92 ms`         |
+| 2        | `3767,79 ms` | `3800 ms`       | -                   |
+| 3        | `3736,06 ms` | `3800 ms`       | -                   |
+| 4        | `3662,68 ms` | `3700 ms`       | -                   |
+| 5        | `3717,01 ms` | `3800 ms`       | -                   |
+
+## Comparing costs
+
+To compare the costs between bot implementation I did a couple of test runs converting a 3 minute `2,8 MB` WebM audio file to MP3. This is by no means very extensive, and your mileage may vary. But IMHO I think it's decent enough to get a first impression in what range the costs might reside in.
+
+### Amazon Elastic Transcoder costs
+
+The <a href="https://aws.amazon.com/elastictranscoder/pricing/" target="_blank" rel="noopener noreferrer">pricing</a> page tells us we pay per minute (with 20 free minutes every month). And when we only transcode audio in region EU Ireland, we'll currently pay `$0.00522` per minute transcoding time.
+
+These are the timing results of the test runs:
+
+| Test run | Transcoding Time |
+| -------- | ---------------- |
+| 1        | `7638 ms`        |
+| 2        | `6663 ms`        |
+| 3        | `7729 ms`        |
+| 4        | `6595 ms`        |
+| 5        | `8752 ms`        |
+| 6        | `7216 ms`        |
+| 7        | `7167 ms`        |
+| 8        | `6605 ms`        |
+| 9        | `6718 ms`        |
+| 10       | `8700 ms`        |
+
+So the average transcoding time of the audio file would be:
+
+```
+7638 + 6663 + 7729 + 6595 + 8752 + 7216 + 7167 + 6605 + 6718 + 8700 = 73783 ms
+
+73783 / 10 = 7378,3 ms
+
+7378,3 / 1000 = 7,3783 sec
+```
+
+Lets say we would be transcoding 100 000 of these audio files per month, that would amount to a total transcoding time of:
+
+```
+7,3783 * 100 000 = 737 830 sec
+
+737 830 / 60 = 12297,166666667 min
+```
+
+And since we pay `$0,00522` per minute, the costs without free tier would be:
+
+```
+12297,166666667 * 0,00522 = $64,19121
+```
+
+With free tier it would cost:
+
+```
+(12297,166666667 - 20) * 0,00522 = $64,08681
+```
+
+#### What about Lambda costs?
+
+We're using Lambda to schedule a transcoder job. So technically, we also have to calculate those (minor if not negligible) costs. The Lambda <a href="https://aws.amazon.com/lambda/pricing/" target="_blank" rel="noopener noreferrer">pricing</a> tells us we pay for the number of requests, and the duration (depending on memory setting).
+
+> We get 1 million requests for free every month, and after that you pay `$0.20` per 1 million requests. So I'm not including it in the calculations.
+
+These are the Lambda durations (`128 MB` memory) for the accompanying transcoder test runs:
+
+| Test run | Duration    | Billed Duration | Cold Start Duration |
+| -------- | ----------- | --------------- | ------------------- |
+| 1        | `494,08 ms` | `500 ms`        | `401,61 ms`         |
+| 2        | `185,01 ms` | `200 ms`        | -                   |
+| 3        | `168,29 ms` | `200 ms`        | -                   |
+| 4        | `165,29 ms` | `200 ms`        | -                   |
+| 5        | `184,89 ms` | `200 ms`        | -                   |
+| 6        | `210,19 ms` | `300 ms`        | -                   |
+| 7        | `162,64 ms` | `200 ms`        | -                   |
+| 8        | `178,79 ms` | `200 ms`        | -                   |
+| 9        | `318,84 ms` | `400 ms`        | -                   |
+| 10       | `206,18 ms` | `300 ms`        | -                   |
+
+The average _billed duration_ would be:
+
+```
+500 + 200 + 200 + 200 + 200 + 300 + 200 + 200 + 400 + 300 = 2700 ms
+
+2700 / 10 = 270 ms
+
+270 / 1000 = 0,27 sec
+```
+
+In region EU Ireland, we'll currently pay `$0,0000166667` for every GB per second. That means we first have to calculate "how much" memory our Lambda uses for its runtime duration. For 100 000 transcoding jobs per month, with a memory setting of `128 MB` that would be:
+
+```
+100 000 * 0,27 = 27000 sec
+
+(128 / 1024) * 27000 = 3375 GB/sec
+```
+
+> Currently you get 400 000 GB/sec for free every month, so depending on your scale you may or may not have to include it in your calculations.
+
+Without free tier it would cost:
+
+```
+3375 * 0,0000166667 = $0,056250113
+```
+
+### FFmpeg + Lambda Layer costs
+
+These are the Lambda durations (`2048 MB` memory) of the test runs:
+
+| Test run | Duration     | Billed Duration | Cold Start Duration |
+| -------- | ------------ | --------------- | ------------------- |
+| 1        | `4068.56 ms` | `4100 ms`       | `408.17 ms`         |
+| 2        | `3880.55 ms` | `3900 ms`       | -                   |
+| 3        | `3910.52 ms` | `4000 ms`       | -                   |
+| 4        | `3794.20 ms` | `3800 ms`       | -                   |
+| 5        | `3856.73 ms` | `3900 ms`       | -                   |
+| 6        | `3859.06 ms` | `3900 ms`       | -                   |
+| 7        | `3810.93 ms` | `3900 ms`       | -                   |
+| 8        | `3799.19 ms` | `3800 ms`       | -                   |
+| 9        | `3858.49 ms` | `3900 ms`       | -                   |
+| 10       | `3866.53 ms` | `3900 ms`       | -                   |
+
+The average _billed duration_ would be:
+
+```
+4100 + 3900 + 4000 + 3800 + 3900 + 3900 + 3900 + 3800 + 3900 + 3900 = 39100 ms
+
+39100 / 10 = 3910 ms
+
+3910 / 1000 = 3,91 sec
+```
+
+In region EU Ireland, we'll currently pay `$0,0000166667` for every GB per second. For 100 000 transcoding jobs, with a memory setting of `2048 MB` that would be:
+
+```
+100 000 * 3,91 = 391 000 sec
+
+(2048 / 1024) * 391 000 = 782 000 GB/sec
+```
+
+Without free tier it would cost:
+
+```
+782 000 * 0,000 0166667 = $13,0333594
+```
+
+With free tier it would cost:
+
+```
+(782 000 - 400 000) * 0,000 0166667 = $6,3666794
+```
+
+### What about data transfer costs?
+
+If possible, keep your infrastructure in the same region to avoid data transfer costs.
+
+> "Data transferred between Amazon S3, Amazon Glacier, Amazon DynamoDB, Amazon SES, Amazon SQS, Amazon Kinesis, Amazon ECR, Amazon SNS, or Amazon SimpleDB and AWS Lambda functions **in the same AWS Region is free**."--from AWS Lambda <a href="https://aws.amazon.com/lambda/pricing/" target="_blank" rel="noopener noreferrer">pricing</a> page
+
+Otherwise, data transferred into and out of Lambda functions will be charged at the <a href="https://aws.amazon.com/ec2/pricing/on-demand/" target="_blank" rel="noopener noreferrer">EC2 data transfer rates</a> as listed here under the “Data transfer” section.
 
 ## In closing
 
