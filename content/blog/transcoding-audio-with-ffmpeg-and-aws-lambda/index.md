@@ -21,7 +21,7 @@ If you'd like to see the full code of the audio transcoder, go to <a href="https
 
 ## Use case
 
-I recently started working on a new side project called <a href="https://www.upstand.fm/" target="_blank" rel="noopener noreferrer">Upstand FM</a>. It's a web app that allows you to record your voice, so other users of the app can listen to what you have to say.
+I recently started working on a new side project called <a href="https://www.upstand.fm/" target="_blank" rel="noopener noreferrer">Upstand FM</a>. It's a web app that allows you to record your voice, so other users of the app can listen to what you have to say--I'm using it to explore a different way to participate in standups when working remotely.
 
 In the app I use the <a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaStream_Recording_API" target="_blank" rel="noopener noreferrer">MediaStream Recording API</a> (aka Media Recording API) to easily record audio from the user's input device. It works really well, and you don't have to use any external libraries!<br/>
 There's one catch though--it only works in Firefox, Chrome and Opera. And at the time of this writing, it "sort of" works in Safari (it's hidden behind a feature flag and not all events are supported). Even though that's a bit disappointing, I'm okay with it for my use case.
@@ -100,6 +100,8 @@ Additionally, we'll need two <a href="https://aws.amazon.com/s3/" target="_blank
 This is a fully managed and highly scalable AWS service that can be used to transcode audio and video files.
 
 We can use this service to schedule a transcoding _job_ in a _pipeline_. The pipeline knows from which bucket to read a file that needs to be converted, and to which bucket the converted file should be written. Whereas the job contains instructions on which file to transcode, and to what format it should be converted.
+
+> At the time of this writing <a href="https://aws.amazon.com/cloudformation/" target="_blank" rel="noopener noreferrer">AWS CloudFormation</a> has **no** support for Amazon Elastic Transcoder. So you'll have to use the AWS web console to create and configure your pipeline(s).
 
 We'll go through the following steps to get it up and running:
 
@@ -1364,12 +1366,12 @@ With free tier it would cost:
 
 ### What about data transfer costs?
 
-If possible, keep your infrastructure in the same region to avoid data transfer costs.
-
 > "Data transferred between S3, Glacier, DynamoDB, SES, SQS, Kinesis, ECR, SNS, or SimpleDB and Lambda functions **in the same AWS Region is free**."--from <a href="https://aws.amazon.com/lambda/pricing/" target="_blank" rel="noopener noreferrer">Lambda pricing page</a>
 
 Otherwise, data transferred into- and out of Lambda functions will be charged at the <a href="https://aws.amazon.com/ec2/pricing/on-demand/" target="_blank" rel="noopener noreferrer">EC2 data transfer rates</a> as listed under the “Data transfer” section.
 
 ## In closing
 
-In this post I showed you a way to implement "serverless audio transcoding".
+That's a wrap! The post turned out a bit longer than expected, but hopefully it will prove useful in your transcoding adventures.
+
+Happy transcoding!
